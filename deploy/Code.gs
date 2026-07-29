@@ -2302,6 +2302,7 @@ function markOrderPurchased_(context, payload, requestId) {
         recoverStaffMutationFailure_(context, requestId, 'MARK_ORDER_PURCHASED', recovery, error);
         throw error;
       }
+    }
   } finally {
     lock.releaseLock();
   }
