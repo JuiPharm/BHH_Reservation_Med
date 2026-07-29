@@ -255,8 +255,53 @@ dialog {
   .header-inner { flex-direction: row; align-items: center; flex-wrap: wrap; }
   .identity { margin-left: auto; }
 }
+
 @media (min-width: 64rem) {
-  .header-inner, main, .site-footer { width: min(100% - 4rem, 76rem); }
+  body {
+    flex-direction: row;
+  }
+  .site-header {
+    width: 260px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .header-inner {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 2rem 1.25rem;
+    height: 100%;
+  }
+  .site-nav {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    margin-top: 1.5rem;
+  }
+  .site-nav a, .site-nav button {
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .identity {
+    margin-top: auto;
+    margin-left: 0;
+    width: 100%;
+    flex-direction: column;
+  }
+  main {
+    flex: 1;
+    width: auto;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding-inline: 2rem;
+  }
+  .site-footer {
+    display: none; /* Hide footer in sidebar layout or manage it differently */
+  }
 }
 
 @media print {

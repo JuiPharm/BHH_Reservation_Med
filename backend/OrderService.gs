@@ -227,12 +227,48 @@ function getStaffDashboard_(context, query) {
   const dashboardQuery = normalizeStaffDashboardQuery_(query);
   const filterDept = isAdmin ? dashboardQuery.department : userDept;
 
+  const cache = CacheService.getScriptCache();
+  const cacheVersion = cache.get('DASHBOARD_VERSION') || '0';
+  const cacheKey = 'STAFF_' + cacheVersion + '_' + Utilities.base64Encode(JSON.stringify({ d: filterDept, s: dashboardQuery.status, q: dashboardQuery.search, f: dashboardQuery.sortField, r: dashboardQuery.sortDirection, p: dashboardQuery.page, z: dashboardQuery.pageSize })).substring(0, 200);
+  
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
+  const allFilteredOrders = [];
+  const counts = {};
+  
+  // Single read for both counting and filtering
   const orders = readRecords_('OrderHeaders', { predicate: function (record) {
-    return !filterDept || String(record.Department || '') === filterDept;
+    if (filterDept && String(record.Department || '') !== filterDept) return false;
+    
+    // Count status before applying search/status filters
+    const status = String(record.Status || 'UNKNOWN');
+    counts[status] = (counts[status] || 0) + 1;
+    
+    // Apply search and status filters for the list
+    if (dashboardQuery.status && String(record.Status || '').toUpperCase() !== dashboardQuery.status) return false;
+    if (dashboardQuery.search && String(record.OrderID || '').toUpperCase().indexOf(dashboardQuery.search) < 0) return false;
+    
+    allFilteredOrders.push(record);
+    return true; // We don't use the return array from readRecords_ for list, we use allFilteredOrders
   } });
-  const counts = orders.reduce(function (result, order) { const status = String(order.Status || 'UNKNOWN'); result[status] = (result[status] || 0) + 1; return result; }, {});
-  const list = listDepartmentOrders_(context, query);
-  return { department: filterDept || (isAdmin ? 'ALL' : userDept), totalOrders: list.total, statusCounts: counts, page: list.page, pageSize: list.pageSize, total: list.total, recentOrders: list.orders };
+
+  sortStaffDashboardOrders_(allFilteredOrders, dashboardQuery.sortField, dashboardQuery.sortDirection);
+  const pageSize = dashboardQuery.pageSize;
+  const page = dashboardQuery.page;
+  const start = (page - 1) * pageSize;
+  const pagedOrders = allFilteredOrders.slice(start, start + pageSize).map(orderSummary_);
+
+  const result = { department: filterDept || (isAdmin ? 'ALL' : userDept), totalOrders: allFilteredOrders.length, statusCounts: counts, page: page, pageSize: pageSize, total: allFilteredOrders.length, recentOrders: pagedOrders };
+  
+  try {
+    const jsonResult = JSON.stringify(result);
+    if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
+  } catch(e) {}
+  
+  return result;
 }
 
 const ADMIN_RECEIVE_ENVELOPE_FIELDS_ = Object.freeze(['OrderID', 'expectedVersion', 'Items']);
@@ -256,12 +292,108 @@ function listAllOrders_(context, query) {
 
 function getAdminDashboard_(context, query) {
   requireAdminOrderContext_(context);
-  const listed = listAllOrders_(context, query);
   const filters = query && typeof query === 'object' ? query : {};
   const department = cleanOrderText_(filters.department || filters.Department).toUpperCase();
-  const orders = readRecords_('OrderHeaders', { predicate: function (order) { return !department || String(order.Department || '').toUpperCase() === department; } });
-  const statusCounts = orders.reduce(function (counts, order) { const status = String(order.Status || 'UNKNOWN'); counts[status] = (counts[status] || 0) + 1; return counts; }, {});
-  return { department: department || 'ALL', totalOrders: orders.length, statusCounts: statusCounts, recentOrders: listed.orders };
+  const statusFilter = cleanOrderText_(filters.status || filters.Status).toUpperCase();
+  const search = cleanOrderText_(filters.orderId || filters.OrderID || filters.search).toUpperCase();
+  const pageSize = Math.min(MAX_ORDER_PAGE_SIZE_, positiveInteger_(filters.pageSize == null ? filters.limit : filters.pageSize, 25));
+  const page = positiveInteger_(filters.page, 1);
+
+  const cache = CacheService.getScriptCache();
+  const cacheVersion = cache.get('DASHBOARD_VERSION') || '0';
+  const cacheKey = 'ADMIN_' + cacheVersion + '_' + Utilities.base64Encode(JSON.stringify({ d: department, s: statusFilter, q: search, p: page, z: pageSize })).substring(0, 200);
+  
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
+  const allFilteredOrders = [];
+  const statusCounts = {};
+
+  const orders = readRecords_('OrderHeaders', { predicate: function (order) { 
+    if (department && String(order.Department || '').toUpperCase() !== department) return false;
+    
+    // Count status before applying search/status filters
+    const status = String(order.Status || 'UNKNOWN');
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
+    
+    // Apply search and status filters for the list
+    if (statusFilter && String(order.Status || '').toUpperCase() !== statusFilter) return false;
+    if (search && String(order.OrderID || '').toUpperCase().indexOf(search) < 0) return false;
+    
+    allFilteredOrders.push(order);
+    return true;
+  } });
+
+  // Optional: You can sort admin orders here if needed, or rely on default sheet order.
+  // Using default sheet order for now to match original behavior, but reversed (newest first).
+  allFilteredOrders.reverse();
+
+  const start = (page - 1) * pageSize;
+  const pagedOrders = allFilteredOrders.slice(start, start + pageSize).map(adminOrderSummary_);
+
+  const result = { department: department || 'ALL', totalOrders: allFilteredOrders.length, statusCounts: statusCounts, page: page, pageSize: pageSize, total: allFilteredOrders.length, recentOrders: pagedOrders };
+  
+  try {
+    const jsonResult = JSON.stringify(result);
+    if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
+  } catch(e) {}
+  
+  return result;
+}
+
+function markOrderPurchased_(context, payload, requestId) {
+  requireAdminOrderContext_(context);
+  const orderId = requireOrderId_(payload);
+  const initial = findOrderHeader_(orderId);
+  if (!initial) throw new ApiError_('ACCESS_DENIED', 'Access denied.');
+  const replay = findStaffMutationReplay_('MARK_ORDER_PURCHASED', context.user.StaffID, requestId);
+  if (replay) return replay.ResponsePayload;
+  const lock = LockService.getScriptLock();
+  let result = null;
+  lock.waitLock(30000);
+  try {
+    const lockedReplay = findStaffMutationReplay_('MARK_ORDER_PURCHASED', context.user.StaffID, requestId);
+    if (lockedReplay) { result = lockedReplay.ResponsePayload; }
+    else {
+      const current = findOrderHeader_(orderId);
+      if (!current) throw new ApiError_('ACCESS_DENIED', 'Access denied.');
+      assertExpectedOrderVersion_(current, Number(payload.expectedVersion));
+      const allowed = ['SUBMITTED', 'UNDER_REVIEW'];
+      if (allowed.indexOf(String(current.Status || '')) < 0) throw new ApiError_('INVALID_STATUS_TRANSITION', 'Order cannot be marked as ordered from its current status.');
+      const now = new Date();
+      const updates = { Status: 'ORDERED', UpdatedAt: toSheetDate_(now), UpdatedBy: context.user.StaffID, Version: Number(current.Version || 0) + 1 };
+      
+      // Update items status too
+      const currentItems = getOrderItems_(orderId);
+      const itemUpdates = currentItems.map(function(item) {
+        if (allowed.indexOf(String(item.Status || '')) >= 0) {
+          return { keyValue: item.OrderItemID, updates: { Status: 'ORDERED', UpdatedAt: toSheetDate_(now), UpdatedBy: context.user.StaffID, Version: Number(item.Version || 0) + 1 } };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      const newHeader = updateRecordByKey_('OrderHeaders', 'OrderID', orderId, updates);
+      if (itemUpdates.length) batchUpdateRecordsByKeys_('OrderItems', 'OrderItemID', itemUpdates);
+      
+      appendRecords_('OrderChangeLog', [{ LogID: generateId_(), OrderID: orderId, StaffID: context.user.StaffID, Timestamp: toSheetDate_(now), OldStatus: current.Status, NewStatus: 'ORDERED', Reason: 'Marked as ordered by admin' }]);
+      result = orderDetail_(newHeader);
+      logStaffMutation_('MARK_ORDER_PURCHASED', context.user.StaffID, requestId, result);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  
+  // Enqueue email for ORDER_PLACED to department email
+  const deptHeader = initial.Department ? readRecords_('Departments', { predicate: function(d) { return d.DepartmentName === initial.Department; }, limit: 1 })[0] : null;
+  const toEmail = deptHeader ? deptHeader.DepartmentEmail : '';
+  const ccEmail = deptHeader ? deptHeader.CCEmail : '';
+  if (toEmail) {
+    enqueueEmailNotification_('ORDER_PLACED', { header: result }, { to: toEmail, cc: ccEmail });
+  }
+  
+  return result;
 }
 
 /** Version-protected receiving write. Mail is deliberately performed after unlock. */

@@ -283,6 +283,7 @@ const API_ACTIONS_ = Object.freeze({
   GET_APPOINTMENT_HISTORY: Object.freeze({ auth: true, mutates: false, handler: 'getAppointmentHistory_' }),
   GET_ADMIN_DASHBOARD: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: false, handler: 'getAdminDashboard_' }),
   LIST_ALL_ORDERS: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: false, handler: 'listAllOrders_' }),
+  MARK_ORDER_PURCHASED: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'markOrderPurchased_' }),
   UPDATE_RECEIVED_ITEMS: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'updateReceivedItems_' }),
   DECIDE_CANCELLATION: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'decideCancellationByAdmin_' }),
   SEND_ORDER_EMAIL: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'sendOrderEmail_' }),
@@ -362,6 +363,7 @@ function resolveApiHandler_(name) {
       case 'getAppointmentHistory_': return getAppointmentHistory_;
       case 'getAdminDashboard_': return getAdminDashboard_;
       case 'listAllOrders_': return listAllOrders_;
+      case 'markOrderPurchased_': return markOrderPurchased_;
       case 'updateReceivedItems_': return updateReceivedItems_;
       case 'decideCancellationByAdmin_': return decideCancellationByAdmin_;
       case 'sendOrderEmail_': return sendOrderEmail_;
@@ -1291,34 +1293,37 @@ function buildOrderEmailTemplate_(templateName, model) {
   const actor = value.actor && typeof value.actor === 'object' ? value.actor : {};
   const orderId = emailText_(header.OrderID);
   const titleByTemplate = {
-    NEW_ORDER: '[New Medication Reservation] Order ID: ',
-    ORDER_UPDATE: '[Medication Reservation Updated] Order ID: ',
-    CANCELLATION: '[Medication Reservation Cancelled] Order ID: ',
-    MEDICATION_RECEIVED: '[Medication Received] Order ID: ',
+    NEW_ORDER: '[คำสั่งจองยาใหม่] Order ID: ',
+    ORDER_PLACED: '[ดำเนินการสั่งซื้อยาแล้ว] Order ID: ',
+    ORDER_UPDATE: '[อัปเดตการจองยา] Order ID: ',
+    CANCELLATION: '[ยกเลิกการจองยา] Order ID: ',
+    MEDICATION_RECEIVED: '[ได้รับยาแล้ว] Order ID: ',
     APPOINTMENT_DUE: '[แจ้งเตือนวันนัดรับยา] Order ID: ',
     APPOINTMENT_RESCHEDULED: '[แจ้งเลื่อนวันนัดรับยา] Order ID: ',
-    PATIENT_RECEIVED_CONFIRMATION: '[Patient Received Medication] Order ID: ',
-    PATIENT_NO_SHOW: '[Patient No-show] Order ID: ',
+    PATIENT_RECEIVED_CONFIRMATION: '[คนไข้รับยาเรียบร้อย] Order ID: ',
+    PATIENT_NO_SHOW: '[คนไข้ไม่มารับยา] Order ID: ',
   };
   if (!titleByTemplate[name]) throw new Error('Unsupported email template.');
 
   let fields = [];
   if (name === 'NEW_ORDER') {
-    fields = [['Order ID', orderId], ['Created at', emailText_(header.CreatedAt)], ['Department', emailText_(header.Department)], ['Requester', emailText_(header.CreatedByName)], ['HN', maskEmailHn_(header.HN)], ['Patient', maskEmailPatient_(header.PatientName)], ['Required date', emailText_(header.RequiredDate)], ['Item count', String(items.length || header.ItemCount || 0)], ['Status', emailText_(header.Status)]];
+    fields = [['รหัสคำขอ', orderId], ['วันที่สร้าง', emailText_(header.CreatedAt)], ['หน่วยงาน', emailText_(header.Department)], ['ผู้ขอเบิก', emailText_(header.CreatedByName)], ['HN', maskEmailHn_(header.HN)], ['คนไข้', maskEmailPatient_(header.PatientName)], ['วันที่ต้องการยา', emailText_(header.RequiredDate)], ['จำนวนรายการ', String(items.length || header.ItemCount || 0)], ['สถานะ', emailText_(header.Status)]];
+  } else if (name === 'ORDER_PLACED') {
+    fields = [['รหัสคำขอ', orderId], ['หน่วยงาน', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['คนไข้', maskEmailPatient_(header.PatientName)], ['วันที่สั่งซื้อ', emailText_(header.UpdatedAt)], ['ผู้ทำรายการ', emailText_(header.UpdatedBy)], ['สถานะ', 'สั่งซื้อแล้ว (ORDERED)']];
   } else if (name === 'ORDER_UPDATE') {
-    fields = [['Changed by', emailText_(value.changedBy || actor.FullName || actor.StaffID)], ['Changed at', emailText_(value.changedAt || value.eventAt || header.UpdatedAt)], ['Change reason', emailText_(value.changeReason)], ['Version', emailText_(header.Version)]];
+    fields = [['แก้ไขโดย', emailText_(value.changedBy || actor.FullName || actor.StaffID)], ['แก้ไขเมื่อ', emailText_(value.changedAt || value.eventAt || header.UpdatedAt)], ['เหตุผล', emailText_(value.changeReason)], ['เวอร์ชัน', emailText_(header.Version)]];
   } else if (name === 'CANCELLATION') {
-    fields = [['Order ID', orderId], ['Department', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['Patient', maskEmailPatient_(header.PatientName)], ['Previous status', emailText_(value.previousStatus)], ['New status', emailText_(header.Status)], ['Cancel reason', emailText_(value.cancelReason || header.CancelReason)], ['Cancelled by', emailText_(value.cancelledBy || header.CancelledBy)], ['Cancelled at', emailText_(value.cancelledAt || header.CancelledAt)]];
+    fields = [['รหัสคำขอ', orderId], ['หน่วยงาน', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['คนไข้', maskEmailPatient_(header.PatientName)], ['สถานะเดิม', emailText_(value.previousStatus)], ['สถานะใหม่', emailText_(header.Status)], ['เหตุผลที่ยกเลิก', emailText_(value.cancelReason || header.CancelReason)], ['ผู้ยกเลิก', emailText_(value.cancelledBy || header.CancelledBy)], ['วันที่ยกเลิก', emailText_(value.cancelledAt || header.CancelledAt)]];
   } else if (name === 'MEDICATION_RECEIVED') {
-    fields = [['Order ID', orderId], ['Current status', emailText_(header.Status)]];
+    fields = [['รหัสคำขอ', orderId], ['สถานะปัจจุบัน', emailText_(header.Status)]];
   } else if (name === 'APPOINTMENT_DUE') {
-    fields = [['Department', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['Patient', maskEmailPatient_(header.PatientName)], ['Required date', emailText_(header.RequiredDate)], ['Item count', String(items.length || header.ItemCount || 0)], ['Current status', emailText_(header.Status)]];
+    fields = [['หน่วยงาน', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['คนไข้', maskEmailPatient_(header.PatientName)], ['วันที่นัดรับยา', emailText_(header.RequiredDate)], ['จำนวนรายการ', String(items.length || header.ItemCount || 0)], ['สถานะปัจจุบัน', emailText_(header.Status)]];
   } else if (name === 'APPOINTMENT_RESCHEDULED') {
-    fields = [['Old required date', emailText_(value.oldRequiredDate || header.LastRequiredDate)], ['New required date', emailText_(value.newRequiredDate || header.RequiredDate)], ['Changed by', emailText_(value.changedBy || actor.FullName || actor.StaffID)], ['Reason', emailText_(value.reason)], ['Reminder', 'A new reminder will be sent on the new appointment date.']];
+    fields = [['วันที่นัดเดิม', emailText_(value.oldRequiredDate || header.LastRequiredDate)], ['วันที่นัดใหม่', emailText_(value.newRequiredDate || header.RequiredDate)], ['เลื่อนโดย', emailText_(value.changedBy || actor.FullName || actor.StaffID)], ['เหตุผล', emailText_(value.reason)], ['การแจ้งเตือน', 'จะมีการแจ้งเตือนใหม่ในวันนัดใหม่']];
   } else if (name === 'PATIENT_RECEIVED_CONFIRMATION') {
-    fields = [['Order ID', orderId], ['Department', emailText_(header.Department)], ['Appointment date', emailText_(header.RequiredDate)], ['Response', 'PATIENT_RECEIVED'], ['Recorded at', emailText_(value.eventAt || header.PatientReceivedAt)]];
+    fields = [['รหัสคำขอ', orderId], ['หน่วยงาน', emailText_(header.Department)], ['วันที่นัดรับยา', emailText_(header.RequiredDate)], ['การตอบกลับ', 'คนไข้รับยาเรียบร้อย'], ['บันทึกเมื่อ', emailText_(value.eventAt || header.PatientReceivedAt)]];
   } else if (name === 'PATIENT_NO_SHOW') {
-    fields = [['Order ID', orderId], ['Department', emailText_(header.Department)], ['Appointment date', emailText_(header.RequiredDate)], ['Response', 'PATIENT_NO_SHOW'], ['Reason code', emailText_(value.reasonCode || header.NoShowReasonCode)], ['Reason detail', emailText_(value.reasonDetail || header.NoShowReasonDetail)], ['Recorded at', emailText_(value.eventAt || header.NoShowRecordedAt)]];
+    fields = [['รหัสคำขอ', orderId], ['หน่วยงาน', emailText_(header.Department)], ['วันที่นัดรับยา', emailText_(header.RequiredDate)], ['การตอบกลับ', 'คนไข้ไม่มารับยา'], ['รหัสเหตุผล', emailText_(value.reasonCode || header.NoShowReasonCode)], ['รายละเอียด', emailText_(value.reasonDetail || header.NoShowReasonDetail)], ['บันทึกเมื่อ', emailText_(value.eventAt || header.NoShowRecordedAt)]];
   }
 
   const changed = name === 'ORDER_UPDATE' && Array.isArray(value.changes) ? value.changes : [];
@@ -1328,13 +1333,13 @@ function buildOrderEmailTemplate_(templateName, model) {
     const label = itemPrefix ? itemPrefix + ' ' + field : field;
     return label + ': ' + maskEmailChangeValue_(field, change.oldValue == null ? change.OldValue : change.oldValue) + ' → ' + maskEmailChangeValue_(field, change.newValue == null ? change.NewValue : change.newValue);
   });
-  const rendersItems = name === 'NEW_ORDER' || name === 'MEDICATION_RECEIVED';
+  const rendersItems = name === 'NEW_ORDER' || name === 'MEDICATION_RECEIVED' || name === 'ORDER_PLACED';
   const itemLines = rendersItems ? items.map(function (item) {
     const itemName = emailText_(item.GenericName || item.MedicationName);
-    if (name === 'NEW_ORDER') return itemName + '; Requested: ' + emailText_(item.RequestedQuantity) + ' ' + emailText_(item.Unit);
+    if (name === 'NEW_ORDER' || name === 'ORDER_PLACED') return itemName + '; จำนวนที่ขอ: ' + emailText_(item.RequestedQuantity) + ' ' + emailText_(item.Unit);
     const status = emailText_(item.ItemStatus || item.Status);
     const received = emailText_(item.ReceivedQuantity) + ' ' + emailText_(item.ReceivedUnit || item.Unit);
-    return itemName + ' — Item status: ' + status + (name === 'MEDICATION_RECEIVED' ? '; Received: ' + received : '');
+    return itemName + ' — สถานะ: ' + status + (name === 'MEDICATION_RECEIVED' ? '; รับมาแล้ว: ' + received : '');
   }) : [];
   const appointmentLinks = name === 'APPOINTMENT_DUE' ? [
     ['คนไข้รับยาเรียบร้อย', emailText_(value.actionLinks && value.actionLinks.received)],
@@ -1760,6 +1765,52 @@ function maskEmailHn_(value) { const text = emailText_(value); return /^07-\d{2}
 function maskEmailPatient_(value) { const name = emailText_(value); return name ? name.split(/\s+/).map(function (part) { return part.charAt(0) + new Array(Math.max(2, part.length)).join('*'); }).join(' ') : '***'; }
 function maskEmailChangeValue_(field, value) { return String(field || '') === 'HN' ? maskEmailHn_(value) : (String(field || '') === 'PatientName' ? maskEmailPatient_(value) : emailText_(value)); }
 
+function enqueueEmailNotification_(templateName, model, recipients) {
+  const queueId = 'Q-' + Utilities.getUuid();
+  const attempt = {
+    QueueID: queueId,
+    TemplateName: String(templateName || '').toUpperCase(),
+    ModelJSON: JSON.stringify({ model: model, recipients: recipients }),
+    Status: 'PENDING',
+    CreatedAt: new Date().toISOString(),
+    ProcessedAt: '',
+    RetryCount: 0,
+    ErrorMessage: ''
+  };
+  appendRecords_('NotificationQueue', [attempt]);
+  return queueId;
+}
+
+function processNotificationQueue_() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    const queue = readRecords_('NotificationQueue', { predicate: function(row) {
+      return String(row.Status) === 'PENDING' && Number(row.RetryCount || 0) < 3;
+    }, limit: 5 });
+    
+    if (!queue.length) return;
+    
+    queue.forEach(function(job) {
+      try {
+        const data = JSON.parse(job.ModelJSON);
+        sendTemplatedEmail_(job.TemplateName, data.model, data.recipients);
+        updateRecordByKey_('NotificationQueue', 'QueueID', job.QueueID, { Status: 'SUCCESS', ProcessedAt: new Date().toISOString() });
+      } catch (e) {
+        updateRecordByKey_('NotificationQueue', 'QueueID', job.QueueID, { 
+          RetryCount: Number(job.RetryCount || 0) + 1,
+          ErrorMessage: String(e.message || e).substring(0, 200),
+          Status: Number(job.RetryCount || 0) >= 2 ? 'FAILED' : 'PENDING'
+        });
+      }
+    });
+  } catch (e) {
+    // Ignore global errors to allow next trigger to run
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /**
  * Bundled from backend/MasterDataService.gs
  */
@@ -2085,12 +2136,48 @@ function getStaffDashboard_(context, query) {
   const dashboardQuery = normalizeStaffDashboardQuery_(query);
   const filterDept = isAdmin ? dashboardQuery.department : userDept;
 
+  const cache = CacheService.getScriptCache();
+  const cacheVersion = cache.get('DASHBOARD_VERSION') || '0';
+  const cacheKey = 'STAFF_' + cacheVersion + '_' + Utilities.base64Encode(JSON.stringify({ d: filterDept, s: dashboardQuery.status, q: dashboardQuery.search, f: dashboardQuery.sortField, r: dashboardQuery.sortDirection, p: dashboardQuery.page, z: dashboardQuery.pageSize })).substring(0, 200);
+  
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
+  const allFilteredOrders = [];
+  const counts = {};
+  
+  // Single read for both counting and filtering
   const orders = readRecords_('OrderHeaders', { predicate: function (record) {
-    return !filterDept || String(record.Department || '') === filterDept;
+    if (filterDept && String(record.Department || '') !== filterDept) return false;
+    
+    // Count status before applying search/status filters
+    const status = String(record.Status || 'UNKNOWN');
+    counts[status] = (counts[status] || 0) + 1;
+    
+    // Apply search and status filters for the list
+    if (dashboardQuery.status && String(record.Status || '').toUpperCase() !== dashboardQuery.status) return false;
+    if (dashboardQuery.search && String(record.OrderID || '').toUpperCase().indexOf(dashboardQuery.search) < 0) return false;
+    
+    allFilteredOrders.push(record);
+    return true; // We don't use the return array from readRecords_ for list, we use allFilteredOrders
   } });
-  const counts = orders.reduce(function (result, order) { const status = String(order.Status || 'UNKNOWN'); result[status] = (result[status] || 0) + 1; return result; }, {});
-  const list = listDepartmentOrders_(context, query);
-  return { department: filterDept || (isAdmin ? 'ALL' : userDept), totalOrders: list.total, statusCounts: counts, page: list.page, pageSize: list.pageSize, total: list.total, recentOrders: list.orders };
+
+  sortStaffDashboardOrders_(allFilteredOrders, dashboardQuery.sortField, dashboardQuery.sortDirection);
+  const pageSize = dashboardQuery.pageSize;
+  const page = dashboardQuery.page;
+  const start = (page - 1) * pageSize;
+  const pagedOrders = allFilteredOrders.slice(start, start + pageSize).map(orderSummary_);
+
+  const result = { department: filterDept || (isAdmin ? 'ALL' : userDept), totalOrders: allFilteredOrders.length, statusCounts: counts, page: page, pageSize: pageSize, total: allFilteredOrders.length, recentOrders: pagedOrders };
+  
+  try {
+    const jsonResult = JSON.stringify(result);
+    if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
+  } catch(e) {}
+  
+  return result;
 }
 
 const ADMIN_RECEIVE_ENVELOPE_FIELDS_ = Object.freeze(['OrderID', 'expectedVersion', 'Items']);
@@ -2114,12 +2201,108 @@ function listAllOrders_(context, query) {
 
 function getAdminDashboard_(context, query) {
   requireAdminOrderContext_(context);
-  const listed = listAllOrders_(context, query);
   const filters = query && typeof query === 'object' ? query : {};
   const department = cleanOrderText_(filters.department || filters.Department).toUpperCase();
-  const orders = readRecords_('OrderHeaders', { predicate: function (order) { return !department || String(order.Department || '').toUpperCase() === department; } });
-  const statusCounts = orders.reduce(function (counts, order) { const status = String(order.Status || 'UNKNOWN'); counts[status] = (counts[status] || 0) + 1; return counts; }, {});
-  return { department: department || 'ALL', totalOrders: orders.length, statusCounts: statusCounts, recentOrders: listed.orders };
+  const statusFilter = cleanOrderText_(filters.status || filters.Status).toUpperCase();
+  const search = cleanOrderText_(filters.orderId || filters.OrderID || filters.search).toUpperCase();
+  const pageSize = Math.min(MAX_ORDER_PAGE_SIZE_, positiveInteger_(filters.pageSize == null ? filters.limit : filters.pageSize, 25));
+  const page = positiveInteger_(filters.page, 1);
+
+  const cache = CacheService.getScriptCache();
+  const cacheVersion = cache.get('DASHBOARD_VERSION') || '0';
+  const cacheKey = 'ADMIN_' + cacheVersion + '_' + Utilities.base64Encode(JSON.stringify({ d: department, s: statusFilter, q: search, p: page, z: pageSize })).substring(0, 200);
+  
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
+  const allFilteredOrders = [];
+  const statusCounts = {};
+
+  const orders = readRecords_('OrderHeaders', { predicate: function (order) { 
+    if (department && String(order.Department || '').toUpperCase() !== department) return false;
+    
+    // Count status before applying search/status filters
+    const status = String(order.Status || 'UNKNOWN');
+    statusCounts[status] = (statusCounts[status] || 0) + 1;
+    
+    // Apply search and status filters for the list
+    if (statusFilter && String(order.Status || '').toUpperCase() !== statusFilter) return false;
+    if (search && String(order.OrderID || '').toUpperCase().indexOf(search) < 0) return false;
+    
+    allFilteredOrders.push(order);
+    return true;
+  } });
+
+  // Optional: You can sort admin orders here if needed, or rely on default sheet order.
+  // Using default sheet order for now to match original behavior, but reversed (newest first).
+  allFilteredOrders.reverse();
+
+  const start = (page - 1) * pageSize;
+  const pagedOrders = allFilteredOrders.slice(start, start + pageSize).map(adminOrderSummary_);
+
+  const result = { department: department || 'ALL', totalOrders: allFilteredOrders.length, statusCounts: statusCounts, page: page, pageSize: pageSize, total: allFilteredOrders.length, recentOrders: pagedOrders };
+  
+  try {
+    const jsonResult = JSON.stringify(result);
+    if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
+  } catch(e) {}
+  
+  return result;
+}
+
+function markOrderPurchased_(context, payload, requestId) {
+  requireAdminOrderContext_(context);
+  const orderId = requireOrderId_(payload);
+  const initial = findOrderHeader_(orderId);
+  if (!initial) throw new ApiError_('ACCESS_DENIED', 'Access denied.');
+  const replay = findStaffMutationReplay_('MARK_ORDER_PURCHASED', context.user.StaffID, requestId);
+  if (replay) return replay.ResponsePayload;
+  const lock = LockService.getScriptLock();
+  let result = null;
+  lock.waitLock(30000);
+  try {
+    const lockedReplay = findStaffMutationReplay_('MARK_ORDER_PURCHASED', context.user.StaffID, requestId);
+    if (lockedReplay) { result = lockedReplay.ResponsePayload; }
+    else {
+      const current = findOrderHeader_(orderId);
+      if (!current) throw new ApiError_('ACCESS_DENIED', 'Access denied.');
+      assertExpectedOrderVersion_(current, Number(payload.expectedVersion));
+      const allowed = ['SUBMITTED', 'UNDER_REVIEW'];
+      if (allowed.indexOf(String(current.Status || '')) < 0) throw new ApiError_('INVALID_STATUS_TRANSITION', 'Order cannot be marked as ordered from its current status.');
+      const now = new Date();
+      const updates = { Status: 'ORDERED', UpdatedAt: toSheetDate_(now), UpdatedBy: context.user.StaffID, Version: Number(current.Version || 0) + 1 };
+      
+      // Update items status too
+      const currentItems = getOrderItems_(orderId);
+      const itemUpdates = currentItems.map(function(item) {
+        if (allowed.indexOf(String(item.Status || '')) >= 0) {
+          return { keyValue: item.OrderItemID, updates: { Status: 'ORDERED', UpdatedAt: toSheetDate_(now), UpdatedBy: context.user.StaffID, Version: Number(item.Version || 0) + 1 } };
+        }
+        return null;
+      }).filter(Boolean);
+      
+      const newHeader = updateRecordByKey_('OrderHeaders', 'OrderID', orderId, updates);
+      if (itemUpdates.length) batchUpdateRecordsByKeys_('OrderItems', 'OrderItemID', itemUpdates);
+      
+      appendRecords_('OrderChangeLog', [{ LogID: generateId_(), OrderID: orderId, StaffID: context.user.StaffID, Timestamp: toSheetDate_(now), OldStatus: current.Status, NewStatus: 'ORDERED', Reason: 'Marked as ordered by admin' }]);
+      result = orderDetail_(newHeader);
+      logStaffMutation_('MARK_ORDER_PURCHASED', context.user.StaffID, requestId, result);
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  
+  // Enqueue email for ORDER_PLACED to department email
+  const deptHeader = initial.Department ? readRecords_('Departments', { predicate: function(d) { return d.DepartmentName === initial.Department; }, limit: 1 })[0] : null;
+  const toEmail = deptHeader ? deptHeader.DepartmentEmail : '';
+  const ccEmail = deptHeader ? deptHeader.CCEmail : '';
+  if (toEmail) {
+    enqueueEmailNotification_('ORDER_PLACED', { header: result }, { to: toEmail, cc: ccEmail });
+  }
+  
+  return result;
 }
 
 /** Version-protected receiving write. Mail is deliberately performed after unlock. */
@@ -3851,6 +4034,7 @@ const SCHEMA_ = Object.freeze({
   OrderItems: Object.freeze({ headers: Object.freeze(['OrderItemID', 'OrderID', 'ItemNo', 'GenericName', 'BrandName', 'Strength', 'DosageForm', 'RequestedQuantity', 'Unit', 'Prescriber', 'ItemStatus', 'ReceivedDate', 'ReceivedQuantity', 'ReceivedUnit', 'AdminNote', 'CreatedAt', 'CreatedBy', 'UpdatedAt', 'UpdatedBy', 'Active', 'CancellationPreviousStatus']), plainTextColumns: Object.freeze([]) }),
   OrderChangeLog: Object.freeze({ headers: Object.freeze(['ChangeLogID', 'ChangeSetID', 'OrderID', 'OrderItemID', 'ChangedAt', 'ChangedByStaffID', 'ChangedByName', 'Department', 'ChangedByRole', 'ActionType', 'FieldName', 'FieldLabel', 'OldValue', 'NewValue', 'ChangeReason', 'OrderVersionBefore', 'OrderVersionAfter', 'RequestID', 'Source', 'Result']), plainTextColumns: Object.freeze(['ChangedByStaffID']) }),
   EmailLog: Object.freeze({ headers: Object.freeze(['EmailLogID', 'OrderID', 'ChangeSetID', 'EmailType', 'Recipient', 'CC', 'Subject', 'SentAt', 'SentBy', 'Result', 'ErrorMessage', 'RetryCount']), plainTextColumns: Object.freeze([]) }),
+  NotificationQueue: Object.freeze({ headers: Object.freeze(['QueueID', 'TemplateName', 'ModelJSON', 'Status', 'CreatedAt', 'ProcessedAt', 'RetryCount', 'ErrorMessage']), plainTextColumns: Object.freeze([]) }),
   AuditLog: Object.freeze({ headers: Object.freeze(['AuditID', 'Timestamp', 'StaffID', 'Role', 'Department', 'Action', 'OrderID', 'OrderItemID', 'RequestID', 'OldValue', 'NewValue', 'Result', 'Detail']), plainTextColumns: Object.freeze(['StaffID']) }),
   Settings: Object.freeze({ headers: Object.freeze(['Key', 'Value', 'Description', 'UpdatedAt', 'UpdatedBy']), plainTextColumns: Object.freeze([]) }),
   MasterData: Object.freeze({ headers: Object.freeze(['Type', 'Code', 'DisplayName', 'SortOrder', 'Active', 'UpdatedAt']), plainTextColumns: Object.freeze([]) }),
@@ -4317,6 +4501,11 @@ function appendRecords_(sheetName, records) {
   });
   const startRow = sheet.getLastRow() + 1;
   sheet.getRange(startRow, 1, rows.length, headers.length).setValues(rows);
+  
+  if (sheetName === 'OrderHeaders') {
+    try { CacheService.getScriptCache().put('DASHBOARD_VERSION', String(Date.now()), 21600); } catch(e) {}
+  }
+  
   return { startRow: startRow, rowCount: rows.length };
 }
 
@@ -4396,6 +4585,10 @@ function batchUpdateRecordsByKeys_(sheetName, keyName, records) {
 }
 
 function writeContiguousUpdateRanges_(sheet, rowNumber, entries) {
+  const sheetName = sheet.getName();
+  if (sheetName === 'OrderHeaders') {
+    try { CacheService.getScriptCache().put('DASHBOARD_VERSION', String(Date.now()), 21600); } catch(e) {}
+  }
   let group = [];
   entries.forEach(function (entry) {
     if (group.length && entry.column !== group[group.length - 1].column + 1) {
@@ -4744,6 +4937,7 @@ function runEmailTests() {
  * Bundled from backend/TriggerService.gs
  */
 const APPOINTMENT_REMINDER_HANDLER_ = 'processAppointmentDueReminders';
+const NOTIFICATION_QUEUE_HANDLER_ = 'processNotificationQueueTimer';
 
 /** Install the daily reminder trigger idempotently without deleting unrelated triggers. */
 function setupAppointmentReminderTrigger() {
@@ -4760,6 +4954,23 @@ function setupAppointmentReminderTrigger() {
     ScriptApp.newTrigger(APPOINTMENT_REMINDER_HANDLER_).timeBased().everyDays(1).atHour(hour).inTimezone(timezone).create();
     return { created: true, handler: APPOINTMENT_REMINDER_HANDLER_, hour: hour, timezone: timezone };
   } finally { lock.releaseLock(); }
+}
+
+function setupNotificationQueueTrigger() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const existing = ScriptApp.getProjectTriggers().filter(function (trigger) {
+      return trigger.getHandlerFunction() === NOTIFICATION_QUEUE_HANDLER_;
+    });
+    if (existing.length) return { created: false, handler: NOTIFICATION_QUEUE_HANDLER_, existing: existing.length };
+    ScriptApp.newTrigger(NOTIFICATION_QUEUE_HANDLER_).timeBased().everyMinutes(1).create();
+    return { created: true, handler: NOTIFICATION_QUEUE_HANDLER_ };
+  } finally { lock.releaseLock(); }
+}
+
+function processNotificationQueueTimer() {
+  processNotificationQueue_();
 }
 
 /**

@@ -39,6 +39,11 @@ function appendRecords_(sheetName, records) {
   });
   const startRow = sheet.getLastRow() + 1;
   sheet.getRange(startRow, 1, rows.length, headers.length).setValues(rows);
+  
+  if (sheetName === 'OrderHeaders') {
+    try { CacheService.getScriptCache().put('DASHBOARD_VERSION', String(Date.now()), 21600); } catch(e) {}
+  }
+  
   return { startRow: startRow, rowCount: rows.length };
 }
 
@@ -118,6 +123,10 @@ function batchUpdateRecordsByKeys_(sheetName, keyName, records) {
 }
 
 function writeContiguousUpdateRanges_(sheet, rowNumber, entries) {
+  const sheetName = sheet.getName();
+  if (sheetName === 'OrderHeaders') {
+    try { CacheService.getScriptCache().put('DASHBOARD_VERSION', String(Date.now()), 21600); } catch(e) {}
+  }
   let group = [];
   entries.forEach(function (entry) {
     if (group.length && entry.column !== group[group.length - 1].column + 1) {

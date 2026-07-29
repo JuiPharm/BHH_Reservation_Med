@@ -1,8 +1,6 @@
 import { API_URL } from './config.js';
 import { clearSession, getSession, refreshSessionExpiry } from './session.js';
-
-const DEFAULT_TIMEOUT_MS = 15000;
-
+const DEFAULT_TIMEOUT_MS = 30000;
 export class ApiRequestError extends Error {
   constructor(message, errorCode = 'NETWORK_ERROR', details = {}) {
     super(message);

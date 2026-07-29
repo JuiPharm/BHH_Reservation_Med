@@ -22,34 +22,37 @@ function buildOrderEmailTemplate_(templateName, model) {
   const actor = value.actor && typeof value.actor === 'object' ? value.actor : {};
   const orderId = emailText_(header.OrderID);
   const titleByTemplate = {
-    NEW_ORDER: '[New Medication Reservation] Order ID: ',
-    ORDER_UPDATE: '[Medication Reservation Updated] Order ID: ',
-    CANCELLATION: '[Medication Reservation Cancelled] Order ID: ',
-    MEDICATION_RECEIVED: '[Medication Received] Order ID: ',
+    NEW_ORDER: '[คำสั่งจองยาใหม่] Order ID: ',
+    ORDER_PLACED: '[ดำเนินการสั่งซื้อยาแล้ว] Order ID: ',
+    ORDER_UPDATE: '[อัปเดตการจองยา] Order ID: ',
+    CANCELLATION: '[ยกเลิกการจองยา] Order ID: ',
+    MEDICATION_RECEIVED: '[ได้รับยาแล้ว] Order ID: ',
     APPOINTMENT_DUE: '[แจ้งเตือนวันนัดรับยา] Order ID: ',
     APPOINTMENT_RESCHEDULED: '[แจ้งเลื่อนวันนัดรับยา] Order ID: ',
-    PATIENT_RECEIVED_CONFIRMATION: '[Patient Received Medication] Order ID: ',
-    PATIENT_NO_SHOW: '[Patient No-show] Order ID: ',
+    PATIENT_RECEIVED_CONFIRMATION: '[คนไข้รับยาเรียบร้อย] Order ID: ',
+    PATIENT_NO_SHOW: '[คนไข้ไม่มารับยา] Order ID: ',
   };
   if (!titleByTemplate[name]) throw new Error('Unsupported email template.');
 
   let fields = [];
   if (name === 'NEW_ORDER') {
-    fields = [['Order ID', orderId], ['Created at', emailText_(header.CreatedAt)], ['Department', emailText_(header.Department)], ['Requester', emailText_(header.CreatedByName)], ['HN', maskEmailHn_(header.HN)], ['Patient', maskEmailPatient_(header.PatientName)], ['Required date', emailText_(header.RequiredDate)], ['Item count', String(items.length || header.ItemCount || 0)], ['Status', emailText_(header.Status)]];
+    fields = [['รหัสคำขอ', orderId], ['วันที่สร้าง', emailText_(header.CreatedAt)], ['หน่วยงาน', emailText_(header.Department)], ['ผู้ขอเบิก', emailText_(header.CreatedByName)], ['HN', maskEmailHn_(header.HN)], ['คนไข้', maskEmailPatient_(header.PatientName)], ['วันที่ต้องการยา', emailText_(header.RequiredDate)], ['จำนวนรายการ', String(items.length || header.ItemCount || 0)], ['สถานะ', emailText_(header.Status)]];
+  } else if (name === 'ORDER_PLACED') {
+    fields = [['รหัสคำขอ', orderId], ['หน่วยงาน', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['คนไข้', maskEmailPatient_(header.PatientName)], ['วันที่สั่งซื้อ', emailText_(header.UpdatedAt)], ['ผู้ทำรายการ', emailText_(header.UpdatedBy)], ['สถานะ', 'สั่งซื้อแล้ว (ORDERED)']];
   } else if (name === 'ORDER_UPDATE') {
-    fields = [['Changed by', emailText_(value.changedBy || actor.FullName || actor.StaffID)], ['Changed at', emailText_(value.changedAt || value.eventAt || header.UpdatedAt)], ['Change reason', emailText_(value.changeReason)], ['Version', emailText_(header.Version)]];
+    fields = [['แก้ไขโดย', emailText_(value.changedBy || actor.FullName || actor.StaffID)], ['แก้ไขเมื่อ', emailText_(value.changedAt || value.eventAt || header.UpdatedAt)], ['เหตุผล', emailText_(value.changeReason)], ['เวอร์ชัน', emailText_(header.Version)]];
   } else if (name === 'CANCELLATION') {
-    fields = [['Order ID', orderId], ['Department', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['Patient', maskEmailPatient_(header.PatientName)], ['Previous status', emailText_(value.previousStatus)], ['New status', emailText_(header.Status)], ['Cancel reason', emailText_(value.cancelReason || header.CancelReason)], ['Cancelled by', emailText_(value.cancelledBy || header.CancelledBy)], ['Cancelled at', emailText_(value.cancelledAt || header.CancelledAt)]];
+    fields = [['รหัสคำขอ', orderId], ['หน่วยงาน', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['คนไข้', maskEmailPatient_(header.PatientName)], ['สถานะเดิม', emailText_(value.previousStatus)], ['สถานะใหม่', emailText_(header.Status)], ['เหตุผลที่ยกเลิก', emailText_(value.cancelReason || header.CancelReason)], ['ผู้ยกเลิก', emailText_(value.cancelledBy || header.CancelledBy)], ['วันที่ยกเลิก', emailText_(value.cancelledAt || header.CancelledAt)]];
   } else if (name === 'MEDICATION_RECEIVED') {
-    fields = [['Order ID', orderId], ['Current status', emailText_(header.Status)]];
+    fields = [['รหัสคำขอ', orderId], ['สถานะปัจจุบัน', emailText_(header.Status)]];
   } else if (name === 'APPOINTMENT_DUE') {
-    fields = [['Department', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['Patient', maskEmailPatient_(header.PatientName)], ['Required date', emailText_(header.RequiredDate)], ['Item count', String(items.length || header.ItemCount || 0)], ['Current status', emailText_(header.Status)]];
+    fields = [['หน่วยงาน', emailText_(header.Department)], ['HN', maskEmailHn_(header.HN)], ['คนไข้', maskEmailPatient_(header.PatientName)], ['วันที่นัดรับยา', emailText_(header.RequiredDate)], ['จำนวนรายการ', String(items.length || header.ItemCount || 0)], ['สถานะปัจจุบัน', emailText_(header.Status)]];
   } else if (name === 'APPOINTMENT_RESCHEDULED') {
-    fields = [['Old required date', emailText_(value.oldRequiredDate || header.LastRequiredDate)], ['New required date', emailText_(value.newRequiredDate || header.RequiredDate)], ['Changed by', emailText_(value.changedBy || actor.FullName || actor.StaffID)], ['Reason', emailText_(value.reason)], ['Reminder', 'A new reminder will be sent on the new appointment date.']];
+    fields = [['วันที่นัดเดิม', emailText_(value.oldRequiredDate || header.LastRequiredDate)], ['วันที่นัดใหม่', emailText_(value.newRequiredDate || header.RequiredDate)], ['เลื่อนโดย', emailText_(value.changedBy || actor.FullName || actor.StaffID)], ['เหตุผล', emailText_(value.reason)], ['การแจ้งเตือน', 'จะมีการแจ้งเตือนใหม่ในวันนัดใหม่']];
   } else if (name === 'PATIENT_RECEIVED_CONFIRMATION') {
-    fields = [['Order ID', orderId], ['Department', emailText_(header.Department)], ['Appointment date', emailText_(header.RequiredDate)], ['Response', 'PATIENT_RECEIVED'], ['Recorded at', emailText_(value.eventAt || header.PatientReceivedAt)]];
+    fields = [['รหัสคำขอ', orderId], ['หน่วยงาน', emailText_(header.Department)], ['วันที่นัดรับยา', emailText_(header.RequiredDate)], ['การตอบกลับ', 'คนไข้รับยาเรียบร้อย'], ['บันทึกเมื่อ', emailText_(value.eventAt || header.PatientReceivedAt)]];
   } else if (name === 'PATIENT_NO_SHOW') {
-    fields = [['Order ID', orderId], ['Department', emailText_(header.Department)], ['Appointment date', emailText_(header.RequiredDate)], ['Response', 'PATIENT_NO_SHOW'], ['Reason code', emailText_(value.reasonCode || header.NoShowReasonCode)], ['Reason detail', emailText_(value.reasonDetail || header.NoShowReasonDetail)], ['Recorded at', emailText_(value.eventAt || header.NoShowRecordedAt)]];
+    fields = [['รหัสคำขอ', orderId], ['หน่วยงาน', emailText_(header.Department)], ['วันที่นัดรับยา', emailText_(header.RequiredDate)], ['การตอบกลับ', 'คนไข้ไม่มารับยา'], ['รหัสเหตุผล', emailText_(value.reasonCode || header.NoShowReasonCode)], ['รายละเอียด', emailText_(value.reasonDetail || header.NoShowReasonDetail)], ['บันทึกเมื่อ', emailText_(value.eventAt || header.NoShowRecordedAt)]];
   }
 
   const changed = name === 'ORDER_UPDATE' && Array.isArray(value.changes) ? value.changes : [];
@@ -59,13 +62,13 @@ function buildOrderEmailTemplate_(templateName, model) {
     const label = itemPrefix ? itemPrefix + ' ' + field : field;
     return label + ': ' + maskEmailChangeValue_(field, change.oldValue == null ? change.OldValue : change.oldValue) + ' → ' + maskEmailChangeValue_(field, change.newValue == null ? change.NewValue : change.newValue);
   });
-  const rendersItems = name === 'NEW_ORDER' || name === 'MEDICATION_RECEIVED';
+  const rendersItems = name === 'NEW_ORDER' || name === 'MEDICATION_RECEIVED' || name === 'ORDER_PLACED';
   const itemLines = rendersItems ? items.map(function (item) {
     const itemName = emailText_(item.GenericName || item.MedicationName);
-    if (name === 'NEW_ORDER') return itemName + '; Requested: ' + emailText_(item.RequestedQuantity) + ' ' + emailText_(item.Unit);
+    if (name === 'NEW_ORDER' || name === 'ORDER_PLACED') return itemName + '; จำนวนที่ขอ: ' + emailText_(item.RequestedQuantity) + ' ' + emailText_(item.Unit);
     const status = emailText_(item.ItemStatus || item.Status);
     const received = emailText_(item.ReceivedQuantity) + ' ' + emailText_(item.ReceivedUnit || item.Unit);
-    return itemName + ' — Item status: ' + status + (name === 'MEDICATION_RECEIVED' ? '; Received: ' + received : '');
+    return itemName + ' — สถานะ: ' + status + (name === 'MEDICATION_RECEIVED' ? '; รับมาแล้ว: ' + received : '');
   }) : [];
   const appointmentLinks = name === 'APPOINTMENT_DUE' ? [
     ['คนไข้รับยาเรียบร้อย', emailText_(value.actionLinks && value.actionLinks.received)],
@@ -490,3 +493,49 @@ function isHttpsActionUrl_(value) {
 function maskEmailHn_(value) { const text = emailText_(value); return /^07-\d{2}-\d{6}$/.test(text) ? '07-**-***' + text.slice(-3) : '***'; }
 function maskEmailPatient_(value) { const name = emailText_(value); return name ? name.split(/\s+/).map(function (part) { return part.charAt(0) + new Array(Math.max(2, part.length)).join('*'); }).join(' ') : '***'; }
 function maskEmailChangeValue_(field, value) { return String(field || '') === 'HN' ? maskEmailHn_(value) : (String(field || '') === 'PatientName' ? maskEmailPatient_(value) : emailText_(value)); }
+
+function enqueueEmailNotification_(templateName, model, recipients) {
+  const queueId = 'Q-' + Utilities.getUuid();
+  const attempt = {
+    QueueID: queueId,
+    TemplateName: String(templateName || '').toUpperCase(),
+    ModelJSON: JSON.stringify({ model: model, recipients: recipients }),
+    Status: 'PENDING',
+    CreatedAt: new Date().toISOString(),
+    ProcessedAt: '',
+    RetryCount: 0,
+    ErrorMessage: ''
+  };
+  appendRecords_('NotificationQueue', [attempt]);
+  return queueId;
+}
+
+function processNotificationQueue_() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) return;
+  try {
+    const queue = readRecords_('NotificationQueue', { predicate: function(row) {
+      return String(row.Status) === 'PENDING' && Number(row.RetryCount || 0) < 3;
+    }, limit: 5 });
+    
+    if (!queue.length) return;
+    
+    queue.forEach(function(job) {
+      try {
+        const data = JSON.parse(job.ModelJSON);
+        sendTemplatedEmail_(job.TemplateName, data.model, data.recipients);
+        updateRecordByKey_('NotificationQueue', 'QueueID', job.QueueID, { Status: 'SUCCESS', ProcessedAt: new Date().toISOString() });
+      } catch (e) {
+        updateRecordByKey_('NotificationQueue', 'QueueID', job.QueueID, { 
+          RetryCount: Number(job.RetryCount || 0) + 1,
+          ErrorMessage: String(e.message || e).substring(0, 200),
+          Status: Number(job.RetryCount || 0) >= 2 ? 'FAILED' : 'PENDING'
+        });
+      }
+    });
+  } catch (e) {
+    // Ignore global errors to allow next trigger to run
+  } finally {
+    lock.releaseLock();
+  }
+}

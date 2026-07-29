@@ -1,58 +1,54 @@
-const crypto = require('node:crypto');
+const crypto = require('crypto');
 
-const PREFIX = 'HMAC-SHA256$v2$';
-
-function base64WebSafe(buffer) {
-  return buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+function base64WebSafeNoPadding(buf) {
+  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function createInitialPinHash(pin, appSecret, salt = crypto.randomBytes(16)) {
-  if (typeof pin !== 'string' || pin.length < 8) throw new Error('PIN must contain at least 8 characters.');
-  if (pin.length > 128) throw new Error('PIN must not exceed 128 characters.');
-  if (!/^[A-Za-z0-9_-]{43}=?$/.test(String(appSecret || ''))) throw new Error('APP_SECRET must be a 32-byte Base64URL value.');
-  if (!Buffer.isBuffer(salt) || salt.length !== 16) throw new Error('Salt must be 16 bytes.');
-  const key = Buffer.from(appSecret, 'base64url');
-  if (key.length !== 32) throw new Error('APP_SECRET must be a 32-byte Base64URL value.');
-  const message = Buffer.concat([Buffer.from('MEDICATION_RESERVATION_PIN_V2\0', 'utf8'), salt, Buffer.from(pin, 'utf8')]);
-  const mac = crypto.createHmac('sha256', key).update(message).digest();
-  return `${PREFIX}${base64WebSafe(salt)}$${base64WebSafe(mac)}`;
+function hashPin(pin, appSecret) {
+  if (!pin || pin.length < 8) {
+    console.error("PIN must be at least 8 characters.");
+    process.exit(1);
+  }
+  if (!appSecret) {
+    console.error("APP_SECRET is required.");
+    process.exit(1);
+  }
+
+  // 1. Decode APP_SECRET
+  const pepperBuf = Buffer.from(appSecret, 'base64');
+  if (pepperBuf.length !== 32) {
+    console.error("APP_SECRET must decode to exactly 32 bytes.");
+    process.exit(1);
+  }
+
+  // 2. Generate random 16-byte salt
+  const saltBuf = crypto.randomBytes(16);
+
+  // 3. Construct domain + salt + pin
+  const domainBuf = Buffer.from("MEDICATION_RESERVATION_PIN_V2\0", 'utf8');
+  const pinBuf = Buffer.from(pin, 'utf8');
+  const messageBuf = Buffer.concat([domainBuf, saltBuf, pinBuf]);
+
+  // 4. Compute HMAC-SHA256
+  const hmac = crypto.createHmac('sha256', pepperBuf);
+  hmac.update(messageBuf);
+  const macBuf = hmac.digest();
+
+  // 5. Format string
+  const hashString = "HMAC-SHA256$v2$" + base64WebSafeNoPadding(saltBuf) + "$" + base64WebSafeNoPadding(macBuf);
+
+  console.log('----------------------------------------');
+  console.log(`PIN      : ${pin}`);
+  console.log(`Hash     : ${hashString}`);
+  console.log('----------------------------------------');
+  console.log(`Copy the Hash value and paste it into the 'PINHash' column of the 'Users' sheet.`);
 }
 
-async function readHiddenValue(prompt) {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) throw new Error('Run this helper from a private interactive terminal.');
-  process.stdout.write(prompt);
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-  return new Promise((resolve, reject) => {
-    let pin = '';
-    const finish = () => {
-      process.stdin.setRawMode(false);
-      process.stdin.pause();
-      process.stdin.off('data', onData);
-    };
-    const onData = (chunk) => {
-      const value = chunk.toString('utf8');
-      if (value === '\u0003') { finish(); reject(new Error('PIN entry cancelled.')); return; }
-      if (value === '\r' || value === '\n') { finish(); process.stdout.write('\n'); resolve(pin); return; }
-      if (value === '\u007f' || value === '\b') { pin = pin.slice(0, -1); return; }
-      if (/^[\x20-\x7e]+$/.test(value)) pin += value;
-    };
-    process.stdin.on('data', onData);
-  });
+const args = process.argv.slice(2);
+if (args.length < 2) {
+  console.log('Usage: node scripts/hash-initial-pin.js <PIN> <APP_SECRET>');
+  console.log('Example: node scripts/hash-initial-pin.js 12345678 "your-base64-app-secret="');
+} else {
+  hashPin(args[0], args[1]);
 }
 
-async function main() {
-  const pin = await readHiddenValue('Enter initial PIN (input is not echoed): ');
-  const appSecret = await readHiddenValue('Enter APP_SECRET (input is not echoed): ');
-  const hash = createInitialPinHash(pin, appSecret);
-  process.stdout.write(`Copy this PINHash directly into the protected Users sheet, then clear your terminal: ${hash}\n`);
-}
-
-if (require.main === module) {
-  main().catch((error) => {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  });
-}
-
-module.exports = { createInitialPinHash };

@@ -13,6 +13,7 @@ const API_ACTIONS_ = Object.freeze({
   GET_APPOINTMENT_HISTORY: Object.freeze({ auth: true, mutates: false, handler: 'getAppointmentHistory_' }),
   GET_ADMIN_DASHBOARD: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: false, handler: 'getAdminDashboard_' }),
   LIST_ALL_ORDERS: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: false, handler: 'listAllOrders_' }),
+  MARK_ORDER_PURCHASED: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'markOrderPurchased_' }),
   UPDATE_RECEIVED_ITEMS: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'updateReceivedItems_' }),
   DECIDE_CANCELLATION: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'decideCancellationByAdmin_' }),
   SEND_ORDER_EMAIL: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'sendOrderEmail_' }),
@@ -92,6 +93,7 @@ function resolveApiHandler_(name) {
       case 'getAppointmentHistory_': return getAppointmentHistory_;
       case 'getAdminDashboard_': return getAdminDashboard_;
       case 'listAllOrders_': return listAllOrders_;
+      case 'markOrderPurchased_': return markOrderPurchased_;
       case 'updateReceivedItems_': return updateReceivedItems_;
       case 'decideCancellationByAdmin_': return decideCancellationByAdmin_;
       case 'sendOrderEmail_': return sendOrderEmail_;

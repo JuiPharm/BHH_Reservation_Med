@@ -70,6 +70,25 @@ function receivedPayload(model) {
   };
 }
 
+const purchaseRequestIds = new Map();
+export async function submitOrderPurchased(orderId, expectedVersion, request = apiRequest, requestIdFactory = createRequestId) {
+  const payload = { OrderID: String(orderId || '').trim(), expectedVersion: Number(expectedVersion) };
+  if (!payload.OrderID || !Number.isInteger(payload.expectedVersion) || payload.expectedVersion < 1) {
+    throw validationError({ _form: 'ข้อมูลไม่ครบถ้วน' });
+  }
+  const key = operationKey('MARK_ORDER_PURCHASED', payload);
+  const requestId = purchaseRequestIds.get(key) || requestIdFactory();
+  purchaseRequestIds.set(key, requestId);
+  try {
+    const result = dataOf(await request('MARK_ORDER_PURCHASED', payload, { requestId }));
+    purchaseRequestIds.delete(key);
+    return result;
+  } catch (error) {
+    if (!ambiguous(error)) purchaseRequestIds.delete(key);
+    throw error;
+  }
+}
+
 export async function submitReceivedItems(model, request = apiRequest, requestIdFactory = createRequestId) {
   const validation = validateReceivedItemsModel(model);
   if (!validation.valid) throw validationError(validation.errors);
@@ -234,7 +253,7 @@ export function receivedRow(item, index = 0) {
 }
 
 async function initializeDashboard() {
-  const root = document.getElementById('admin-dashboard');
+  const root = document.getElementById('admin-orders-panel');
   if (!root) return;
   if (!requireAuth()) return;
   const loading = document.getElementById('page-loading');
@@ -262,6 +281,9 @@ async function initializeDetail() {
   const summary = document.getElementById('admin-order-summary');
   const items = document.getElementById('received-items');
   const form = document.getElementById('received-items-form');
+  const purchasingPanel = document.getElementById('order-purchasing-section');
+  const markPurchasedBtn = document.getElementById('mark-order-purchased');
+  const purchasedResult = document.getElementById('purchased-result');
   const send = document.getElementById('send-order-email');
   const emailResult = document.getElementById('email-result');
   const cancellationPanel = document.getElementById('cancellation-decision');
@@ -303,9 +325,35 @@ async function initializeDetail() {
     version = Number(order.Version || 0);
     summary.replaceChildren(renderOrderSummary(order));
     items.replaceChildren(...(detail.items || []).map(receivedRow));
-    cancellationPanel.hidden = String(order.Status || '') !== 'CANCEL_REQUESTED';
-  } catch (reason) { error.textContent = reason.message || 'ไม่สามารถโหลดคำขอได้'; form.querySelector('button').disabled = true; send.disabled = true; }
+    
+    const status = String(order.Status || '');
+    cancellationPanel.hidden = status !== 'CANCEL_REQUESTED';
+    purchasingPanel.hidden = (status !== 'SUBMITTED' && status !== 'UNDER_REVIEW');
+    if (!purchasingPanel.hidden) form.hidden = true; // hide receive items if not yet ordered (optional UX)
+    else form.hidden = false;
+    
+  } catch (reason) { error.textContent = reason.message || 'ไม่สามารถโหลดคำขอได้'; form.querySelector('button').disabled = true; send.disabled = true; markPurchasedBtn.disabled = true; }
   finally { setLoading(loading, false); }
+  
+  markPurchasedBtn.addEventListener('click', async () => {
+    if (!await confirmAction({ title: 'ยืนยันการสั่งซื้อ', message: 'ต้องการบันทึกว่าคำขอนี้ได้สั่งซื้อไปแล้วใช่หรือไม่?', confirmLabel: 'ยืนยันสั่งซื้อ' })) return;
+    markPurchasedBtn.disabled = true; setLoading(loading, true, 'กำลังบันทึกการสั่งซื้อ');
+    try {
+      const result = await submitOrderPurchased(orderId, version);
+      version = Number(result.Version || version);
+      purchasedResult.textContent = 'บันทึกการสั่งซื้อเรียบร้อยแล้ว';
+      purchasingPanel.hidden = true; form.hidden = false;
+      showToast('บันทึกการสั่งซื้อแล้ว', 'success');
+      // Update summary status
+      summary.replaceChildren(renderOrderSummary(result));
+    } catch (reason) {
+      markPurchasedBtn.disabled = false;
+      showToast(reason.message || 'ไม่สามารถบันทึกได้', 'error');
+    } finally {
+      setLoading(loading, false);
+    }
+  });
+
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
     const submit = form.querySelector('[type="submit"]');
