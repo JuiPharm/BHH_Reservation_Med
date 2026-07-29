@@ -385,12 +385,11 @@ function markOrderPurchased_(context, payload, requestId) {
     lock.releaseLock();
   }
   
-  // Enqueue email for ORDER_PLACED to department email
   const deptHeader = initial.Department ? readRecords_('Departments', { predicate: function(d) { return d.DepartmentName === initial.Department; }, limit: 1 })[0] : null;
   const toEmail = deptHeader ? deptHeader.DepartmentEmail : '';
   const ccEmail = deptHeader ? deptHeader.CCEmail : '';
   if (toEmail) {
-    enqueueEmailNotification_('ORDER_PLACED', { header: result }, { to: toEmail, cc: ccEmail });
+    enqueueEmailNotification_('ORDER_PLACED', { header: result, items: getOrderItems_(orderId) }, { to: toEmail, cc: ccEmail });
   }
   
   return result;
