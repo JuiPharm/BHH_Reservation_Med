@@ -9,7 +9,8 @@ function setupApplication() {
   properties.setProperty('FRONTEND_BASE_URL', configuration.normalized.FRONTEND_BASE_URL);
   const health = initializeDatabase();
   const reminderTrigger = setupAppointmentReminderTrigger();
-  return { initialized: true, healthy: Boolean(health && health.healthy), health: health, reminderTrigger: reminderTrigger };
+  const defaultAdmin = seedDefaultAdminUser_();
+  return { initialized: true, healthy: Boolean(health && health.healthy), health: health, reminderTrigger: reminderTrigger, defaultAdmin: defaultAdmin };
 }
 
 function doPost(event) {

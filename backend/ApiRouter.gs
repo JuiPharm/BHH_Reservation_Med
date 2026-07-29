@@ -22,6 +22,10 @@ const API_ACTIONS_ = Object.freeze({
   GET_RESCHEDULE_ORDER: Object.freeze({ auth: true, mutates: false, handler: 'getRescheduleOrder_' }),
   SUBMIT_APPOINTMENT_RESCHEDULE: Object.freeze({ auth: true, mutates: true, handler: 'submitAppointmentReschedule_' }),
   GET_DATABASE_HEALTH: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: false, handler: 'getDatabaseHealth' }),
+  LIST_USERS: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: false, handler: 'listUsers_' }),
+  CREATE_USER: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'createUserByAdmin_' }),
+  RESET_USER_PIN: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'resetUserPinByAdmin_' }),
+  UPDATE_USER: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'updateUserByAdmin_' }),
 });
 
 const GET_ACTIONS_ = Object.freeze({
@@ -98,6 +102,10 @@ function resolveApiHandler_(name) {
       case 'submitAppointmentReschedule_': return submitAppointmentReschedule_;
       case 'getAppointmentAction_': return getAppointmentAction_;
       case 'getRescheduleReference_': return getRescheduleReference_;
+      case 'listUsers_': return listUsers_;
+      case 'createUserByAdmin_': return createUserByAdmin_;
+      case 'resetUserPinByAdmin_': return resetUserPinByAdmin_;
+      case 'updateUserByAdmin_': return updateUserByAdmin_;
       default: throw new ApiError_('UNKNOWN_ACTION', 'Unsupported action.');
     }
   } catch (_ignored) {

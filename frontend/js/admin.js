@@ -355,4 +355,254 @@ async function initializeDetail() {
   });
 }
 
-if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => { initializeDashboard(); initializeDetail(); });
+// User Management Implementation
+let allUsers = [];
+
+export async function fetchUsersList(request = apiRequest) {
+  const result = await request('LIST_USERS', {});
+  return dataOf(result);
+}
+
+export async function createUser(payload, request = apiRequest) {
+  const result = await request('CREATE_USER', payload);
+  return dataOf(result);
+}
+
+export async function resetUserPin(payload, request = apiRequest) {
+  const result = await request('RESET_USER_PIN', payload);
+  return dataOf(result);
+}
+
+export async function updateUserStatus(staffId, active, request = apiRequest) {
+  const result = await request('UPDATE_USER', { staffId, active });
+  return dataOf(result);
+}
+
+function renderUsersTable(tbody, users) {
+  tbody.replaceChildren();
+  if (!users || !users.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 7;
+    td.className = 'text-center';
+    td.textContent = 'ไม่พบข้อมูลผู้ใช้งาน';
+    tr.append(td);
+    tbody.append(tr);
+    return;
+  }
+  users.forEach((user) => {
+    const tr = document.createElement('tr');
+
+    const tdStaff = document.createElement('td');
+    tdStaff.textContent = user.StaffID || '—';
+
+    const tdName = document.createElement('td');
+    tdName.textContent = user.FullName || '—';
+
+    const tdDept = document.createElement('td');
+    tdDept.textContent = user.Department || '—';
+
+    const tdEmail = document.createElement('td');
+    tdEmail.textContent = user.Email || '—';
+
+    const tdRole = document.createElement('td');
+    const roleBadge = document.createElement('span');
+    roleBadge.className = `badge-role ${String(user.Role).toLowerCase()}`;
+    roleBadge.textContent = user.Role;
+    tdRole.append(roleBadge);
+
+    const tdActive = document.createElement('td');
+    const activeBadge = document.createElement('span');
+    activeBadge.className = `badge-active ${user.Active ? 'active' : 'inactive'}`;
+    activeBadge.textContent = user.Active ? 'เปิดใช้งาน' : 'ระงับการใช้';
+    tdActive.append(activeBadge);
+
+    const tdActions = document.createElement('td');
+    const btnReset = document.createElement('button');
+    btnReset.type = 'button';
+    btnReset.className = 'btn-sm secondary';
+    btnReset.textContent = 'รีเซ็ต PIN';
+    btnReset.addEventListener('click', () => openResetPinModal(user));
+
+    const btnToggle = document.createElement('button');
+    btnToggle.type = 'button';
+    btnToggle.className = `btn-sm ${user.Active ? 'danger' : 'primary'}`;
+    btnToggle.textContent = user.Active ? 'ระงับ' : 'เปิดใช้งาน';
+    btnToggle.style.marginLeft = '0.35rem';
+    btnToggle.addEventListener('click', () => toggleUserActive(user));
+
+    tdActions.append(btnReset, btnToggle);
+    tr.append(tdStaff, tdName, tdDept, tdEmail, tdRole, tdActive, tdActions);
+    tbody.append(tr);
+  });
+}
+
+function openResetPinModal(user) {
+  const modal = document.getElementById('modal-reset-pin');
+  if (!modal) return;
+  document.getElementById('reset-target-name').textContent = user.FullName || '—';
+  document.getElementById('reset-target-id').textContent = user.StaffID || '—';
+  document.getElementById('reset-target-staffid-input').value = user.StaffID || '';
+  document.getElementById('reset-pin-error').textContent = '';
+  document.getElementById('form-reset-pin').reset();
+  modal.showModal();
+}
+
+async function toggleUserActive(user) {
+  const newStatus = !user.Active;
+  const actionLabel = newStatus ? 'เปิดใช้งาน' : 'ระงับการใช้งาน';
+  if (!await confirmAction({ title: `ยืนยัน${actionLabel}`, message: `คุณต้องการ${actionLabel} ผู้ใช้ ${user.FullName} (${user.StaffID}) ใช่หรือไม่?` })) return;
+  const loading = document.getElementById('page-loading');
+  setLoading(loading, true, `กำลัง${actionLabel}...`);
+  try {
+    await updateUserStatus(user.StaffID, newStatus);
+    showToast(`${actionLabel}สำเร็จ`, 'success');
+    await refreshUserList();
+  } catch (err) {
+    showToast(err.message || 'ไม่สามารถปรับอัปเดตสถานะผู้ใช้ได้', 'error');
+  } finally {
+    setLoading(loading, false);
+  }
+}
+
+async function refreshUserList() {
+  const tbody = document.getElementById('admin-users-tbody');
+  const loading = document.getElementById('page-loading');
+  const error = document.getElementById('page-error');
+  if (!tbody) return;
+  setLoading(loading, true, 'กำลังโหลดรายการผู้ใช้งาน');
+  error.textContent = '';
+  try {
+    const data = await fetchUsersList();
+    allUsers = data.users || [];
+    filterAndRenderUsers();
+  } catch (err) {
+    error.textContent = err.message || 'ไม่สามารถดึงรายการผู้ใช้งานได้';
+  } finally {
+    setLoading(loading, false);
+  }
+}
+
+function filterAndRenderUsers() {
+  const tbody = document.getElementById('admin-users-tbody');
+  const searchInput = document.getElementById('user-search');
+  const term = String(searchInput ? searchInput.value : '').trim().toLowerCase();
+  if (!term) {
+    renderUsersTable(tbody, allUsers);
+    return;
+  }
+  const filtered = allUsers.filter((u) =>
+    String(u.StaffID || '').toLowerCase().includes(term) ||
+    String(u.FullName || '').toLowerCase().includes(term) ||
+    String(u.Department || '').toLowerCase().includes(term) ||
+    String(u.Email || '').toLowerCase().includes(term) ||
+    String(u.Role || '').toLowerCase().includes(term)
+  );
+  renderUsersTable(tbody, filtered);
+}
+
+function initializeUserManagement() {
+  const tabOrders = document.getElementById('tab-orders');
+  const tabUsers = document.getElementById('tab-users');
+  const panelOrders = document.getElementById('admin-orders-panel');
+  const panelUsers = document.getElementById('admin-users-panel');
+
+  if (tabOrders && tabUsers) {
+    tabOrders.addEventListener('click', () => {
+      tabOrders.classList.add('active'); tabOrders.setAttribute('aria-selected', 'true');
+      tabUsers.classList.remove('active'); tabUsers.setAttribute('aria-selected', 'false');
+      panelOrders.hidden = false; panelUsers.hidden = true;
+    });
+    tabUsers.addEventListener('click', () => {
+      tabUsers.classList.add('active'); tabUsers.setAttribute('aria-selected', 'true');
+      tabOrders.classList.remove('active'); tabOrders.setAttribute('aria-selected', 'false');
+      panelUsers.hidden = false; panelOrders.hidden = true;
+      refreshUserList();
+    });
+  }
+
+  const searchInput = document.getElementById('user-search');
+  if (searchInput) searchInput.addEventListener('input', filterAndRenderUsers);
+
+  // Create User Modal Handlers
+  const modalCreate = document.getElementById('modal-create-user');
+  const btnOpenCreate = document.getElementById('btn-open-create-user');
+  const btnCancelCreate = document.getElementById('btn-cancel-create-user');
+  const formCreate = document.getElementById('form-create-user');
+  const createError = document.getElementById('create-user-error');
+
+  if (btnOpenCreate && modalCreate) {
+    btnOpenCreate.addEventListener('click', () => {
+      if (createError) createError.textContent = '';
+      if (formCreate) formCreate.reset();
+      modalCreate.showModal();
+    });
+  }
+  if (btnCancelCreate && modalCreate) {
+    btnCancelCreate.addEventListener('click', () => modalCreate.close());
+  }
+
+  if (formCreate) {
+    formCreate.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(formCreate);
+      const payload = {
+        staffId: formData.get('staffId'),
+        fullName: formData.get('fullName'),
+        department: formData.get('department'),
+        email: formData.get('email'),
+        role: formData.get('role'),
+        pin: formData.get('pin'),
+      };
+      const loading = document.getElementById('page-loading');
+      if (createError) createError.textContent = '';
+      setLoading(loading, true, 'กำลังเพิ่มผู้ใช้งาน');
+      try {
+        await createUser(payload);
+        showToast('เพิ่มผู้ใช้งานใหม่เรียบร้อยแล้ว', 'success');
+        modalCreate.close();
+        await refreshUserList();
+      } catch (err) {
+        if (createError) createError.textContent = err.message || 'ไม่สามารถเพิ่มผู้ใช้งานได้';
+      } finally {
+        setLoading(loading, false);
+      }
+    });
+  }
+
+  // Reset PIN Modal Handlers
+  const modalReset = document.getElementById('modal-reset-pin');
+  const btnCancelReset = document.getElementById('btn-cancel-reset-pin');
+  const formReset = document.getElementById('form-reset-pin');
+  const resetError = document.getElementById('reset-pin-error');
+
+  if (btnCancelReset && modalReset) {
+    btnCancelReset.addEventListener('click', () => modalReset.close());
+  }
+
+  if (formReset) {
+    formReset.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(formReset);
+      const payload = {
+        staffId: formData.get('staffId'),
+        newPin: formData.get('newPin'),
+      };
+      const loading = document.getElementById('page-loading');
+      if (resetError) resetError.textContent = '';
+      setLoading(loading, true, 'กำลังตั้งรหัสผ่านใหม่');
+      try {
+        await resetUserPin(payload);
+        showToast('ตั้งรหัสผ่านใหม่เรียบร้อยแล้ว', 'success');
+        modalReset.close();
+      } catch (err) {
+        if (resetError) resetError.textContent = err.message || 'ไม่สามารถตั้งรหัสผ่านใหม่ได้';
+      } finally {
+        setLoading(loading, false);
+      }
+    });
+  }
+}
+
+if (typeof document !== 'undefined') document.addEventListener('DOMContentLoaded', () => { initializeDashboard(); initializeDetail(); initializeUserManagement(); });
+
