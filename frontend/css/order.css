@@ -1,0 +1,8 @@
+.order-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem 1rem; }
+.order-summary div { min-width: 0; }
+.order-summary dt { color: var(--muted); font-size: .875rem; }
+.order-summary dd { margin: .15rem 0 0; overflow-wrap: anywhere; }
+.order-detail-section { margin-top: 1rem; border: 1px solid var(--border); border-radius: .5rem; padding: .75rem 1rem; }
+.order-detail-section summary { cursor: pointer; font-weight: 700; min-height: 2.75rem; display: flex; align-items: center; }
+.plain-list { padding-left: 1.5rem; }
+.conflict-message { margin-block: 1rem; padding: 1rem; border: 1px solid var(--danger); border-radius: .5rem; color: var(--danger); }

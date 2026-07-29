@@ -1,0 +1,5 @@
+.auth-layout { display: grid; place-items: center; min-height: 70vh; }
+.auth-panel { width: min(100%, 30rem); }
+.field { display: grid; gap: .35rem; margin-block: 1rem; }
+.field input { border: 1px solid var(--border); border-radius: .5rem; padding: .65rem; width: 100%; }
+.auth-panel [type="submit"] { width: 100%; }

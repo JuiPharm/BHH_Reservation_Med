@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="th">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>ผู้ดูแลระบบ | ระบบจองยาเฉพาะราย</title><link rel="stylesheet" href="css/main.css"><link rel="stylesheet" href="css/admin.css"></head>
+<body data-requires-auth="true">
+<a class="skip-link" href="#main-content">ข้ามไปเนื้อหาหลัก</a>
+<header class="site-header"><div class="header-inner"><a class="brand" href="admin.html"><img class="brand-logo" src="assets/logo-placeholder.svg" alt="โลโก้ระบบจองยาเฉพาะราย"><span class="brand-fallback" hidden>ระบบจองยาเฉพาะราย</span><span>ระบบจองยาเฉพาะราย</span></a><nav class="site-nav" aria-label="เมนูหลัก"><a href="dashboard.html">แดชบอร์ด</a><a aria-current="page" href="admin.html">ผู้ดูแลระบบ</a><button type="button" class="secondary" data-action="logout">ออกจากระบบ</button></nav><div class="identity" aria-label="ข้อมูลผู้ใช้"><span id="identity-name">—</span><span id="identity-staff-id">—</span><span id="identity-department">—</span><span id="identity-role">—</span></div></div></header>
+<main id="main-content" tabindex="-1"><section id="admin-dashboard" class="panel"><h1 class="page-title">แดชบอร์ดผู้ดูแลระบบ</h1><p>สิทธิ์ผู้ดูแลจะได้รับการตรวจสอบจากบริการก่อนแสดงข้อมูล</p><label class="admin-filter" for="admin-department">หน่วยงาน<input id="admin-department" name="department" autocomplete="off"></label><div class="table-wrap"><table class="orders-table"><caption>คำขอที่ผ่านตัวกรอง</caption><thead><tr><th scope="col">เลขที่คำขอ</th><th scope="col">หน่วยงาน</th><th scope="col">สถานะ</th><th scope="col">วันนัด</th><th scope="col">รายการ</th></tr></thead><tbody id="admin-orders"></tbody></table></div></section><p id="page-loading" class="status-message" role="status" aria-live="polite" hidden></p><p id="page-error" class="error-message" role="alert" aria-live="assertive"></p></main>
+<footer class="site-footer">ระบบสำหรับเจ้าหน้าที่ผู้ได้รับอนุญาตเท่านั้น</footer><div id="toast-region" role="status" aria-live="polite" hidden></div><script type="module" src="js/auth.js"></script><script type="module" src="js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+.workflow-form { display: grid; gap: 1rem; }
+.form-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+.workflow-form label { display: grid; gap: .35rem; font-weight: 600; }
+.workflow-form input, .workflow-form select { min-height: 2.75rem; border: 1px solid var(--border); border-radius: .5rem; padding: .5rem .65rem; background: var(--surface); color: var(--text); }
+.form-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+.medication-items { display: grid; gap: 1rem; }
+.medication-item { display: grid; grid-template-columns: 1fr; gap: .75rem; min-width: 0; border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; }
+.medication-item legend { padding-inline: .25rem; font-weight: 700; }
+.medication-item button { grid-column: 1 / -1; justify-self: start; }
+.workflow-form label, .medication-item label, [data-field-error], [data-medication-field-error] { min-width: 0; overflow-wrap: anywhere; }
+@media (min-width: 48rem) {
+  .form-grid, .medication-item { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 64rem) {
+  .medication-item { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

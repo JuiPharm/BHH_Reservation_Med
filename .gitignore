@@ -1,0 +1,15 @@
+.worktrees/
+.superpowers/
+node_modules/
+coverage/
+.env
+.env.*
+!.env.example
+.clasp.json
+backend/.clasp.json
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+npm-debug.log*
+*.log

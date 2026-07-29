@@ -1,0 +1,16 @@
+@import url('./forms.css');
+@import url('./dashboard.css');
+
+.admin-filter { display: grid; gap: .35rem; max-width: 20rem; margin-block: 1rem; font-weight: 600; }
+.admin-filter input, .received-item input, .received-item select { min-height: 2.75rem; border: 1px solid var(--border); border-radius: .5rem; padding: .5rem .65rem; background: var(--surface); color: var(--text); }
+.received-items { display: grid; gap: 1rem; }
+.received-item { display: grid; grid-template-columns: 1fr; gap: .75rem; min-width: 0; border: 1px solid var(--border); border-radius: .5rem; padding: 1rem; }
+.received-item legend { font-weight: 700; padding-inline: .25rem; }
+.received-item label { display: grid; gap: .35rem; font-weight: 600; }
+.admin-email-section { margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+.appointment-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .75rem; }
+.appointment-preview div { border: 1px solid var(--border); border-radius: .5rem; padding: .75rem; }
+.appointment-preview dt { color: var(--muted); font-size: .875rem; }
+.appointment-preview dd { margin: .2rem 0 0; font-weight: 700; }
+@media (min-width: 48rem) { .received-item { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 64rem) { .received-item { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

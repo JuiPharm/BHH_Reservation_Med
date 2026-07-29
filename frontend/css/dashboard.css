@@ -1,0 +1,23 @@
+.dashboard-controls { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-block: 1rem; }
+.dashboard-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; margin-block: 1rem; }
+.status-card { min-height: 5rem; text-align: left; background: var(--surface); color: var(--primary-dark); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+.orders-table { width: 100%; border-collapse: collapse; min-width: 0; }
+.orders-table th, .orders-table td { padding: .75rem; border-bottom: 1px solid var(--border); text-align: left; }
+.pagination { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; margin-top: 1rem; }
+@media (max-width: 47.99rem) {
+  .table-wrap { overflow-x: visible; border: 0; }
+  .orders-table, .orders-table tbody, .orders-table tr, .orders-table td { display: block; width: 100%; }
+  .orders-table thead { display: none; }
+  .orders-table tr { margin-block: .75rem; border: 1px solid var(--border); border-radius: .5rem; overflow: hidden; }
+  .orders-table td { display: grid; grid-template-columns: minmax(7rem, .9fr) minmax(0, 1.1fr); gap: .75rem; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+  .orders-table td:last-child { border-bottom: 0; }
+  .orders-table td::before { content: attr(data-label); color: var(--muted); font-weight: 700; }
+}
+@media (min-width: 48rem) {
+  .dashboard-controls { grid-template-columns: minmax(0, 1fr) minmax(12rem, 18rem); }
+  .orders-table { min-width: 38rem; }
+}
+@media (min-width: 64rem) {
+  .dashboard-counts { grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+}

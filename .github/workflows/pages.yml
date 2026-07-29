@@ -1,0 +1,34 @@
+name: Deploy frontend to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Configure public Apps Script endpoint
+        env:
+          APPS_SCRIPT_URL: ${{ vars.APPS_SCRIPT_URL }}
+        run: APPS_SCRIPT_URL="${APPS_SCRIPT_URL:-https://script.google.com/macros/s/AKfycbx7xTpLRQ_sLHhwV2ftw2VLOQp5x2qJeDRxyx1fIEcCOimu9dacNOBIyvbOBPy38vTv6A/exec}" node scripts/configure-pages.mjs
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/
+      - id: deployment
+        uses: actions/deploy-pages@v4
