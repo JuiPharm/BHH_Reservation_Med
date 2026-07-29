@@ -2271,25 +2271,37 @@ function markOrderPurchased_(context, payload, requestId) {
       assertExpectedOrderVersion_(current, Number(payload.expectedVersion));
       const allowed = ['SUBMITTED', 'UNDER_REVIEW'];
       if (allowed.indexOf(String(current.Status || '')) < 0) throw new ApiError_('INVALID_STATUS_TRANSITION', 'Order cannot be marked as ordered from its current status.');
-      const now = new Date();
-      const updates = { Status: 'ORDERED', UpdatedAt: now.toISOString(), UpdatedBy: context.user.StaffID, Version: Number(current.Version || 0) + 1 };
+      const now = new Date().toISOString();
+      const versionAfter = Number(current.Version || 0) + 1;
+      const changeSetId = 'CHGSET-' + Utilities.getUuid();
       
-      // Update items status too
+      const headerUpdates = { Status: 'ORDERED', UpdatedAt: now, UpdatedBy: String(context.user.StaffID), Version: versionAfter, LastChangeSetID: changeSetId, LastChangeType: 'MARK_ORDER_PURCHASED', LastChangedAt: now, LastChangedBy: String(context.user.StaffID), LastChangeReason: 'Marked as ordered by admin' };
+      const changes = [{ scope: 'order', itemId: '', field: 'Status', oldValue: String(current.Status || ''), newValue: 'ORDERED' }];
+      
       const currentItems = getOrderItems_(orderId);
       const itemUpdates = currentItems.map(function(item) {
-        if (allowed.indexOf(String(item.Status || '')) >= 0) {
-          return { keyValue: item.OrderItemID, updates: { Status: 'ORDERED', UpdatedAt: now.toISOString(), UpdatedBy: context.user.StaffID, Version: Number(item.Version || 0) + 1 } };
+        const itemStatus = String(item.ItemStatus || item.Status || '');
+        if (allowed.indexOf(itemStatus) >= 0) {
+          changes.push({ scope: 'item', itemId: item.OrderItemID, field: 'ItemStatus', oldValue: itemStatus, newValue: 'ORDERED' });
+          return { keyValue: item.OrderItemID, updates: { ItemStatus: 'ORDERED', UpdatedAt: now, UpdatedBy: String(context.user.StaffID) } };
         }
         return null;
       }).filter(Boolean);
       
-      const newHeader = updateRecordByKey_('OrderHeaders', 'OrderID', orderId, updates);
-      if (itemUpdates.length) batchUpdateRecordsByKeys_('OrderItems', 'OrderItemID', itemUpdates);
-      
-      appendRecords_('OrderChangeLog', [{ LogID: generateId_(), OrderID: orderId, StaffID: context.user.StaffID, Timestamp: now.toISOString(), OldStatus: current.Status, NewStatus: 'ORDERED', Reason: 'Marked as ordered by admin' }]);
-      result = orderDetail_(newHeader);
-      logStaffMutation_('MARK_ORDER_PURCHASED', context.user.StaffID, requestId, result);
-    }
+      const recovery = { orderId: orderId, current: current, currentItems: currentItems, versionAfter: versionAfter, changeSetId: changeSetId, newItemIds: [], changes: changes, historyWritten: false, action: 'MARK_ORDER_PURCHASED' };
+      beginStaffMutationRequest_(context, requestId, 'MARK_ORDER_PURCHASED', orderId);
+      try {
+        const newHeader = updateRecordByKey_('OrderHeaders', 'OrderID', orderId, headerUpdates);
+        if (itemUpdates.length) batchUpdateRecordsByKeys_('OrderItems', 'OrderItemID', itemUpdates);
+        writeChanges_(staffMutationChangeRows_(changes, context, current, versionAfter, changeSetId, requestId, 'MARK_ORDER_PURCHASED', 'Marked as ordered by admin'));
+        recovery.historyWritten = true;
+        result = orderDetail_(newHeader);
+        writeAudit_(orderAuditEntry_(context, requestId, orderId, 'MARK_ORDER_PURCHASED', 'SUCCESS', JSON.stringify({ status: 'ORDERED' })));
+        completeStaffMutationRequest_(context, requestId, 'MARK_ORDER_PURCHASED', orderId, result);
+      } catch (error) {
+        recoverStaffMutationFailure_(context, requestId, 'MARK_ORDER_PURCHASED', recovery, error);
+        throw error;
+      }
   } finally {
     lock.releaseLock();
   }
