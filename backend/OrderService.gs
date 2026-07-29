@@ -363,13 +363,13 @@ function markOrderPurchased_(context, payload, requestId) {
       const allowed = ['SUBMITTED', 'UNDER_REVIEW'];
       if (allowed.indexOf(String(current.Status || '')) < 0) throw new ApiError_('INVALID_STATUS_TRANSITION', 'Order cannot be marked as ordered from its current status.');
       const now = new Date();
-      const updates = { Status: 'ORDERED', UpdatedAt: toSheetDate_(now), UpdatedBy: context.user.StaffID, Version: Number(current.Version || 0) + 1 };
+      const updates = { Status: 'ORDERED', UpdatedAt: now.toISOString(), UpdatedBy: context.user.StaffID, Version: Number(current.Version || 0) + 1 };
       
       // Update items status too
       const currentItems = getOrderItems_(orderId);
       const itemUpdates = currentItems.map(function(item) {
         if (allowed.indexOf(String(item.Status || '')) >= 0) {
-          return { keyValue: item.OrderItemID, updates: { Status: 'ORDERED', UpdatedAt: toSheetDate_(now), UpdatedBy: context.user.StaffID, Version: Number(item.Version || 0) + 1 } };
+          return { keyValue: item.OrderItemID, updates: { Status: 'ORDERED', UpdatedAt: now.toISOString(), UpdatedBy: context.user.StaffID, Version: Number(item.Version || 0) + 1 } };
         }
         return null;
       }).filter(Boolean);
@@ -377,7 +377,7 @@ function markOrderPurchased_(context, payload, requestId) {
       const newHeader = updateRecordByKey_('OrderHeaders', 'OrderID', orderId, updates);
       if (itemUpdates.length) batchUpdateRecordsByKeys_('OrderItems', 'OrderItemID', itemUpdates);
       
-      appendRecords_('OrderChangeLog', [{ LogID: generateId_(), OrderID: orderId, StaffID: context.user.StaffID, Timestamp: toSheetDate_(now), OldStatus: current.Status, NewStatus: 'ORDERED', Reason: 'Marked as ordered by admin' }]);
+      appendRecords_('OrderChangeLog', [{ LogID: generateId_(), OrderID: orderId, StaffID: context.user.StaffID, Timestamp: now.toISOString(), OldStatus: current.Status, NewStatus: 'ORDERED', Reason: 'Marked as ordered by admin' }]);
       result = orderDetail_(newHeader);
       logStaffMutation_('MARK_ORDER_PURCHASED', context.user.StaffID, requestId, result);
     }
