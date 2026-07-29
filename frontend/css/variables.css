@@ -1,35 +1,50 @@
 :root {
-  --primary: #2563eb;
-  --primary-hover: #1d4ed8;
-  --primary-dark: #1e3a8a;
-  --primary-light: #eff6ff;
+  /* Core Color Palette: Modern Teal/Cyan */
+  --primary: #0d9488;       /* Teal 600 */
+  --primary-hover: #0f766e; /* Teal 700 */
+  --primary-dark: #115e59;  /* Teal 800 */
+  --primary-light: #ccfbf1; /* Teal 50 */
 
-  --accent: #10b981;
-  --accent-dark: #047857;
-  --accent-light: #ecfdf5;
+  --accent: #06b6d4;        /* Cyan 500 */
+  --accent-dark: #0891b2;   /* Cyan 600 */
+  --accent-light: #cffafe;  /* Cyan 50 */
 
-  --surface: #ffffff;
-  --canvas: #f8fafc;
+  /* Surface & Background */
+  --surface: rgba(255, 255, 255, 0.85); /* Slightly transparent for glassmorphism */
+  --surface-solid: #ffffff;
+  --canvas: #f0fdfa;        /* Teal 50 as base canvas */
   --canvas-alt: #f1f5f9;
 
-  --text: #0f172a;
-  --text-secondary: #475569;
-  --muted: #64748b;
+  /* Typography Colors */
+  --text: #0f172a;          /* Slate 900 */
+  --text-secondary: #334155;/* Slate 700 */
+  --muted: #64748b;         /* Slate 500 */
 
+  /* State Colors */
   --danger: #ef4444;
   --danger-light: #fef2f2;
   --warning: #f59e0b;
   --warning-light: #fffbeb;
+  --success: #10b981;
+  --success-light: #ecfdf5;
 
+  /* Borders & Focus */
   --border: #cbd5e1;
-  --border-focus: #2563eb;
-  --focus: #2563eb;
+  --border-focus: #0d9488;
+  --focus: rgba(13, 148, 136, 0.3); /* Soft glow focus */
 
+  /* Radii */
   --radius-sm: 0.5rem;
-  --radius: 0.875rem;
-  --radius-lg: 1.25rem;
+  --radius: 1rem;
+  --radius-lg: 1.5rem;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
-  --shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 4px 6px -2px rgba(15, 23, 42, 0.03);
-  --shadow-lg: 0 20px 30px -10px rgba(15, 23, 42, 0.1), 0 10px 15px -5px rgba(15, 23, 42, 0.04);
+  /* Shadows (Modern soft glows) */
+  --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
+  --shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.1), 0 4px 6px -2px rgba(13, 148, 136, 0.05);
+  --shadow-lg: 0 20px 40px -10px rgba(13, 148, 136, 0.2), 0 15px 20px -5px rgba(13, 148, 136, 0.1);
+  --shadow-hover: 0 15px 30px -5px rgba(13, 148, 136, 0.15), 0 8px 10px -2px rgba(13, 148, 136, 0.08);
+
+  /* Animations */
+  --transition-fast: 0.15s ease-out;
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
