@@ -1,5 +1,71 @@
-.auth-layout { display: grid; place-items: center; min-height: 70vh; }
-.auth-panel { width: min(100%, 30rem); }
-.field { display: grid; gap: .35rem; margin-block: 1rem; }
-.field input { border: 1px solid var(--border); border-radius: .5rem; padding: .65rem; width: 100%; }
-.auth-panel [type="submit"] { width: 100%; }
+.auth-layout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 1.5rem;
+}
+
+.auth-panel {
+  width: min(100%, 28rem);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 2.5rem 2rem;
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.auth-panel h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  text-align: center;
+}
+
+.auth-panel p.subtitle {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-bottom: 1.75rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.4rem;
+  margin-block: 1.25rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.field input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  width: 100%;
+  font-size: 1rem;
+  background: var(--canvas-alt);
+  transition: all 0.2s ease;
+}
+
+.field input:focus {
+  background: var(--surface);
+  border-color: var(--border-focus);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--focus);
+}
+
+.auth-panel [type="submit"] {
+  width: 100%;
+  min-height: 48px;
+  font-size: 1.05rem;
+  margin-top: 1rem;
+}

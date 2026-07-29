@@ -174,9 +174,13 @@ function rollbackPlan_(sheetName, appendResult, keyName, expectedIds, attempted)
 }
 
 function listDepartmentOrders_(context, query) {
+  const isAdmin = context && context.user && String(context.user.Role || '').toUpperCase() === 'ADMIN';
+  const userDept = String(context && context.user && context.user.Department || '');
   const dashboardQuery = normalizeStaffDashboardQuery_(query);
+  const filterDept = isAdmin ? dashboardQuery.department : userDept;
+
   const matching = readRecords_('OrderHeaders', { predicate: function (record) {
-    if (String(record.Department || '') !== String(context.user.Department || '')) return false;
+    if (filterDept && String(record.Department || '') !== filterDept) return false;
     if (dashboardQuery.status && String(record.Status || '').toUpperCase() !== dashboardQuery.status) return false;
     return !dashboardQuery.search || String(record.OrderID || '').toUpperCase().indexOf(dashboardQuery.search) >= 0;
   } });
@@ -191,12 +195,13 @@ function normalizeStaffDashboardQuery_(query) {
   const input = query && typeof query === 'object' && !Array.isArray(query) ? query : {};
   const filters = input.filters && typeof input.filters === 'object' && !Array.isArray(input.filters) ? input.filters : {};
   const status = Object.prototype.hasOwnProperty.call(filters, STAFF_DASHBOARD_FILTER_FIELDS_[0]) ? cleanOrderText_(filters.Status).toUpperCase() : '';
+  const department = cleanOrderText_(input.department || filters.department || filters.Department).toUpperCase();
   const search = cleanOrderText_(input.search).toUpperCase();
   const sortMatch = /^([A-Za-z]+):(asc|desc)$/i.exec(cleanOrderText_(input.sort));
   const sortField = sortMatch && STAFF_DASHBOARD_SORT_FIELDS_[sortMatch[1].toUpperCase()] ? STAFF_DASHBOARD_SORT_FIELDS_[sortMatch[1].toUpperCase()] : 'CreatedAt';
   const sortDirection = sortMatch && STAFF_DASHBOARD_SORT_FIELDS_[sortMatch[1].toUpperCase()] && sortMatch[2].toLowerCase() === 'asc' ? 1 : -1;
   return {
-    status: status, search: search, sortField: sortField, sortDirection: sortDirection,
+    status: status, department: department, search: search, sortField: sortField, sortDirection: sortDirection,
     page: positiveInteger_(input.page, 1), pageSize: Math.min(MAX_ORDER_PAGE_SIZE_, positiveInteger_(input.pageSize == null ? input.limit : input.pageSize, 25)),
   };
 }
@@ -217,11 +222,17 @@ function getOrderDetail_(context, orderId) {
 }
 
 function getStaffDashboard_(context, query) {
-  const department = String(context.user.Department || '');
-  const orders = readRecords_('OrderHeaders', { predicate: function (record) { return String(record.Department || '') === department; } });
+  const isAdmin = context && context.user && String(context.user.Role || '').toUpperCase() === 'ADMIN';
+  const userDept = String(context && context.user && context.user.Department || '');
+  const dashboardQuery = normalizeStaffDashboardQuery_(query);
+  const filterDept = isAdmin ? dashboardQuery.department : userDept;
+
+  const orders = readRecords_('OrderHeaders', { predicate: function (record) {
+    return !filterDept || String(record.Department || '') === filterDept;
+  } });
   const counts = orders.reduce(function (result, order) { const status = String(order.Status || 'UNKNOWN'); result[status] = (result[status] || 0) + 1; return result; }, {});
   const list = listDepartmentOrders_(context, query);
-  return { department: department, totalOrders: list.total, statusCounts: counts, page: list.page, pageSize: list.pageSize, total: list.total, recentOrders: list.orders };
+  return { department: filterDept || (isAdmin ? 'ALL' : userDept), totalOrders: list.total, statusCounts: counts, page: list.page, pageSize: list.pageSize, total: list.total, recentOrders: list.orders };
 }
 
 const ADMIN_RECEIVE_ENVELOPE_FIELDS_ = Object.freeze(['OrderID', 'expectedVersion', 'Items']);

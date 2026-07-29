@@ -57,19 +57,48 @@ function renderOrders(container, orders) {
     const idCell = document.createElement('td');
     idCell.append(link);
     idCell.dataset.label = 'เลขที่คำขอ';
-    row.append(idCell, textCell(order.Status, 'สถานะ'), textCell(order.Priority, 'ความสำคัญ'), textCell(order.ItemCount, 'รายการ'), textCell(formatBangkokTime(order.CreatedAt), 'สร้างเมื่อ'));
+
+    const statusCell = document.createElement('td');
+    statusCell.dataset.label = 'สถานะ';
+    const statusBadge = document.createElement('span');
+    const st = String(order.Status || '').toLowerCase();
+    statusBadge.className = `status-badge ${st}`;
+    statusBadge.textContent = order.Status || '—';
+    statusCell.append(statusBadge);
+
+    const deptCell = textCell(order.Department || '—', 'หน่วยงาน');
+
+    row.append(idCell, deptCell, statusCell, textCell(order.Priority, 'ความสำคัญ'), textCell(order.ItemCount, 'รายการ'), textCell(formatBangkokTime(order.CreatedAt), 'สร้างเมื่อ'));
     container.append(row);
   });
 }
 
 function renderCounts(container, statusCounts, update) {
   container.replaceChildren();
+  const statusLabels = {
+    SUBMITTED: 'ยื่นคำขอแล้ว',
+    RECEIVED: 'รับยาแล้ว',
+    PARTIALLY_RECEIVED: 'รับยาบางส่วน',
+    CANCEL_REQUESTED: 'ขอยกเลิก',
+    CANCELLED: 'ยกเลิกแล้ว',
+    NOTIFIED: 'แจ้งเตือนแล้ว',
+  };
+
   Object.entries(statusCounts || {}).forEach(([status, count]) => {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = 'status-card';
     card.dataset.status = status;
-    card.textContent = `${status}: ${count}`;
+
+    const label = document.createElement('span');
+    label.className = 'status-card-label';
+    label.textContent = statusLabels[status] || status;
+
+    const num = document.createElement('span');
+    num.className = 'status-card-count';
+    num.textContent = count;
+
+    card.append(label, num);
     bindStatusCard(card, update);
     container.append(card);
   });
