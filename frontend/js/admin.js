@@ -319,7 +319,6 @@ async function initializeDetail() {
   };
   setLoading(loading, true, 'กำลังตรวจสอบสิทธิ์และโหลดคำขอ');
   try {
-    await loadAdminDashboard({}); // Successful response is the ADMIN authorization confirmation.
     const detail = await loadOrderDetail(orderId);
     const order = detail.order || {};
     version = Number(order.Version || 0);
