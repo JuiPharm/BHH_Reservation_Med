@@ -324,6 +324,15 @@ async function initializeDetail() {
     const order = detail.order || {};
     version = Number(order.Version || 0);
     summary.replaceChildren(renderOrderSummary(order));
+    
+    const requestedItemsList = document.getElementById('requested-items-list');
+    requestedItemsList.replaceChildren();
+    (detail.items || []).forEach((item) => {
+      const row = document.createElement('li');
+      row.textContent = `${item.GenericName || 'ยา'} ${item.Strength || ''} — จำนวนที่ขอ: ${item.RequestedQuantity || '—'} ${item.Unit || ''}`;
+      requestedItemsList.append(row);
+    });
+
     items.replaceChildren(...(detail.items || []).map(receivedRow));
     
     const status = String(order.Status || '');
