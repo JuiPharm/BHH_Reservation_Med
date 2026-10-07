@@ -1,0 +1,22 @@
+name: Backend regression checks
+
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'tests/backend/**'
+      - '.github/workflows/backend-regression-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  backend-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run backend regression suite
+        run: node --test tests/backend/*.test.js
