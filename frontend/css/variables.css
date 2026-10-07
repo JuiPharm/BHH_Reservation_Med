@@ -1,50 +1,40 @@
 :root {
-  /* Core Color Palette: Modern Teal/Cyan */
-  --primary: #0d9488;       /* Teal 600 */
-  --primary-hover: #0f766e; /* Teal 700 */
-  --primary-dark: #115e59;  /* Teal 800 */
-  --primary-light: #ccfbf1; /* Teal 50 */
+  --primary: #203f79;
+  --primary-hover: #17366f;
+  --primary-dark: #102a56;
+  --primary-light: #edf4ff;
+  --accent: #b61f2e;
+  --accent-hover: #941824;
+  --accent-light: #ffe9ec;
 
-  --accent: #06b6d4;        /* Cyan 500 */
-  --accent-dark: #0891b2;   /* Cyan 600 */
-  --accent-light: #cffafe;  /* Cyan 50 */
-
-  /* Surface & Background */
-  --surface: rgba(255, 255, 255, 0.85); /* Slightly transparent for glassmorphism */
+  --surface: #ffffff;
   --surface-solid: #ffffff;
-  --canvas: #f0fdfa;        /* Teal 50 as base canvas */
-  --canvas-alt: #f1f5f9;
+  --canvas: #f3f7fc;
+  --canvas-alt: #f8fafc;
+  --text: #18212d;
+  --text-secondary: #40566d;
+  --muted: #738291;
 
-  /* Typography Colors */
-  --text: #0f172a;          /* Slate 900 */
-  --text-secondary: #334155;/* Slate 700 */
-  --muted: #64748b;         /* Slate 500 */
+  --danger: #c6283d;
+  --danger-light: #ffe9ed;
+  --warning: #d98200;
+  --warning-light: #fff4df;
+  --success: #168653;
+  --success-light: #e7f8ee;
+  --info: #0f78c9;
+  --info-light: #e8f4ff;
 
-  /* State Colors */
-  --danger: #ef4444;
-  --danger-light: #fef2f2;
-  --warning: #f59e0b;
-  --warning-light: #fffbeb;
-  --success: #10b981;
-  --success-light: #ecfdf5;
+  --border: #d8e4f2;
+  --border-focus: #254d8e;
+  --focus: rgba(37, 77, 142, 0.22);
 
-  /* Borders & Focus */
-  --border: #cbd5e1;
-  --border-focus: #0d9488;
-  --focus: rgba(13, 148, 136, 0.3); /* Soft glow focus */
-
-  /* Radii */
-  --radius-sm: 0.5rem;
+  --radius-sm: 0.75rem;
   --radius: 1rem;
-  --radius-lg: 1.5rem;
-
-  /* Shadows (Modern soft glows) */
-  --shadow-sm: 0 2px 4px rgba(15, 23, 42, 0.04), 0 1px 2px rgba(15, 23, 42, 0.02);
-  --shadow: 0 10px 25px -5px rgba(13, 148, 136, 0.1), 0 4px 6px -2px rgba(13, 148, 136, 0.05);
-  --shadow-lg: 0 20px 40px -10px rgba(13, 148, 136, 0.2), 0 15px 20px -5px rgba(13, 148, 136, 0.1);
-  --shadow-hover: 0 15px 30px -5px rgba(13, 148, 136, 0.15), 0 8px 10px -2px rgba(13, 148, 136, 0.08);
-
-  /* Animations */
-  --transition-fast: 0.15s ease-out;
-  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --radius-lg: 1.35rem;
+  --shadow-sm: 0 4px 14px rgba(32, 63, 121, 0.06);
+  --shadow: 0 12px 30px rgba(32, 63, 121, 0.08);
+  --shadow-lg: 0 24px 60px rgba(32, 63, 121, 0.16);
+  --shadow-hover: 0 18px 36px rgba(32, 63, 121, 0.14);
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.22s ease;
 }
