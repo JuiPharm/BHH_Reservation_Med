@@ -81,7 +81,9 @@ function provisionInitialV2Admin() {
   lock.waitLock(30000);
   try {
     // Re-read under lock to prevent concurrent provisioning.
-    const spreadsheet = SpreadsheetApp.openById(inspection.spreadsheetId);
+    const spreadsheetId = String(properties.getProperty('SPREADSHEET_ID_V2') || '').trim();
+    if (!spreadsheetId) throw new Error('SPREADSHEET_ID_V2 is required.');
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     const usersSheet = requireV2Sheet_(spreadsheet, 'T_Users');
     const departmentsSheet = requireV2Sheet_(spreadsheet, 'M_Departments');
     assertV2DepartmentActive_(departmentsSheet, inspection.departmentId);
