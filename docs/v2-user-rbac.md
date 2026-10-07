@@ -42,7 +42,7 @@ Use the operator-only Apps Script function `provisionInitialV2Admin()`. Before r
 - `V2_BOOTSTRAP_ADMIN_STAFF_ID` = `ADMIN01` (optional; this is the default)
 - `V2_BOOTSTRAP_ADMIN_NAME` = desired display name (optional)
 - `V2_BOOTSTRAP_ADMIN_DEPARTMENT_ID` = `DEPT-PHARMACY` (optional; this is the default)
-- `V2_BOOTSTRAP_ADMIN_PASSWORD` = a temporary 8–128 character password entered only in Script Properties
+- `V2_BOOTSTRAP_ADMIN_PIN` = a temporary 8–128 character password entered only in Script Properties
 
 Run `provisionInitialV2Admin()` once from the Apps Script editor.
 
@@ -52,7 +52,20 @@ The function:
 3. creates the credential with the existing server-side `HMAC-SHA256$v2` implementation and `APP_SECRET`,
 4. activates the `SYSTEM_ADMIN`,
 5. writes an audit row,
-6. deletes the one-time password Script Property,
+6. deletes the one-time PIN Script Property,
 7. disables the bootstrap flag.
 
-Never commit the temporary password or `APP_SECRET`.
+Never commit the temporary PIN or `APP_SECRET`.
+
+
+## Mandatory preflight
+
+Before provisioning, run:
+
+```javascript
+validateV2BootstrapConfig()
+```
+
+Only continue when the returned/logged object has `ok: true`.
+
+The preflight checks the current v2 spreadsheet, required columns, `DEPT-PHARMACY`, `APP_SECRET`, bootstrap enable flag, and the temporary PIN without logging either secret.
