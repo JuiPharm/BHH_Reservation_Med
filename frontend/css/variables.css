@@ -6,7 +6,6 @@
   --accent: #b61f2e;
   --accent-hover: #941824;
   --accent-light: #ffe9ec;
-
   --surface: #ffffff;
   --surface-solid: #ffffff;
   --canvas: #f3f7fc;
@@ -14,7 +13,6 @@
   --text: #18212d;
   --text-secondary: #40566d;
   --muted: #738291;
-
   --danger: #c6283d;
   --danger-light: #ffe9ed;
   --warning: #d98200;
@@ -23,11 +21,9 @@
   --success-light: #e7f8ee;
   --info: #0f78c9;
   --info-light: #e8f4ff;
-
   --border: #d8e4f2;
   --border-focus: #254d8e;
-  --focus: rgba(37, 77, 142, 0.22);
-
+  --focus: #254d8e;
   --radius-sm: 0.75rem;
   --radius: 1rem;
   --radius-lg: 1.35rem;
