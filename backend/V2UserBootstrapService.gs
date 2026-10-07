@@ -39,7 +39,7 @@ function provisionInitialV2Admin() {
   if (!staffId) throw new Error('V2 bootstrap admin StaffID is required.');
   if (!staffName) throw new Error('V2 bootstrap admin name is required.');
   if (!departmentId) throw new Error('V2 bootstrap admin DepartmentID is required.');
-  assertProvisionedPinPolicy_(temporaryPassword);
+  assertV2BootstrapPasswordPolicy_(temporaryPassword);
 
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
@@ -51,7 +51,7 @@ function provisionInitialV2Admin() {
     assertV2DepartmentActive_(departmentsSheet, departmentId);
 
     const now = new Date().toISOString();
-    const passwordHash = createPinHash_(temporaryPassword);
+    const passwordHash = createV2BootstrapPasswordHash_(temporaryPassword);
     const existing = findV2RowByValue_(usersSheet, 'StaffID', staffId);
     const existingValues = existing ? existing.record : {};
     const nextVersion = Math.max(0, Number(existingValues.Version || 0)) + 1;
@@ -192,4 +192,66 @@ function redactV2UserForAudit_(record) {
   delete safe.PasswordHash;
   delete safe.PasswordSalt;
   return safe;
+}
+
+
+/**
+ * Self-contained credential helpers for the one-time v2 bootstrap.
+ * These deliberately use v2-specific names so this file can coexist with
+ * SecurityService.gs without creating duplicate global function names.
+ */
+function assertV2BootstrapPasswordPolicy_(password) {
+  if (typeof password !== 'string' || password.length < 8 || password.length > 128) {
+    throw new Error('V2_BOOTSTRAP_ADMIN_PASSWORD must contain 8 to 128 characters.');
+  }
+}
+
+function createV2BootstrapPasswordHash_(password) {
+  assertV2BootstrapPasswordPolicy_(password);
+  const salt = v2BootstrapRandomBytes_(16);
+  const mac = v2BootstrapComputePasswordMac_(password, salt);
+  return 'HMAC-SHA256$v2$' + v2BootstrapBase64WebSafeNoPadding_(salt) + '$' + v2BootstrapBase64WebSafeNoPadding_(mac);
+}
+
+function v2BootstrapComputePasswordMac_(password, salt) {
+  const domain = Array.prototype.slice.call(
+    Utilities.newBlob('MEDICATION_RESERVATION_PIN_V2\u0000').getBytes()
+  );
+  const passwordBytes = Array.prototype.slice.call(Utilities.newBlob(String(password)).getBytes());
+  return Array.prototype.slice.call(
+    Utilities.computeHmacSha256Signature(
+      domain.concat(salt, passwordBytes),
+      v2BootstrapAppSecretBytes_()
+    )
+  );
+}
+
+function v2BootstrapAppSecretBytes_() {
+  const encoded = String(
+    PropertiesService.getScriptProperties().getProperty('APP_SECRET') || ''
+  ).trim();
+
+  if (!/^[A-Za-z0-9_-]{43}=?$/.test(encoded)) {
+    throw new Error('APP_SECRET is not configured correctly. It must be a 32-byte Base64URL secret.');
+  }
+
+  const bytes = Array.prototype.slice.call(Utilities.base64DecodeWebSafe(encoded));
+  if (bytes.length !== 32) {
+    throw new Error('APP_SECRET is not configured correctly. It must decode to exactly 32 bytes.');
+  }
+  return bytes;
+}
+
+function v2BootstrapRandomBytes_(length) {
+  let hex = '';
+  while (hex.length < length * 2) hex += Utilities.getUuid().replace(/-/g, '');
+  const bytes = [];
+  for (let index = 0; index < length * 2; index += 2) {
+    bytes.push(parseInt(hex.substr(index, 2), 16));
+  }
+  return bytes;
+}
+
+function v2BootstrapBase64WebSafeNoPadding_(bytes) {
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, '');
 }
