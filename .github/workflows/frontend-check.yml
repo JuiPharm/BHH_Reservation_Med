@@ -1,0 +1,28 @@
+name: Frontend contract checks
+
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'tests/frontend/**'
+      - '.github/workflows/frontend-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Check JavaScript syntax
+        run: |
+          for file in frontend/js/*.js; do
+            node --check "$file"
+          done
+      - name: Run frontend contract tests
+        run: node --test tests/frontend/*.test.js
