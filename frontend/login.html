@@ -1,7 +1,12 @@
 <!doctype html>
-<html lang="th">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>เข้าสู่ระบบ | BHH Medication Reservation</title><link rel="stylesheet" href="css/main.css"><link rel="stylesheet" href="css/auth.css"></head>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>เข้าสู่ระบบ | BHH Medication Reservation</title><link rel="stylesheet" href="css/main.css"><link rel="stylesheet" href="css/auth.css"></head>
 <body>
+<a class="skip-link" href="#main-content">ข้ามไปเนื้อหาหลัก</a>
+<header class="site-header"><div class="header-inner">
+  <a class="brand" href="index.html"><img class="brand-logo" src="assets/bdms-bhh-logo.svg" alt="โลโก้ระบบจองยาเฉพาะราย"><span class="brand-fallback" hidden>BHH Medication Reservation</span><span>BHH Medication Reservation</span></a>
+  <nav class="site-nav" aria-label="เมนูหลัก"><a href="login.html">เข้าสู่ระบบ</a><button type="button" class="secondary" data-action="logout">ออกจากระบบ</button></nav>
+  <div class="identity" aria-label="ข้อมูลผู้ใช้"><span id="identity-name">—</span><span id="identity-staff-id">—</span><span id="identity-department">—</span><span id="identity-role">—</span></div>
+</div></header>
 <main id="main-content" class="auth-layout" tabindex="-1">
   <div class="auth-shell">
     <section class="auth-brand-panel" aria-label="ข้อมูลระบบ">
@@ -19,9 +24,9 @@
         <button type="submit">เข้าสู่ระบบ</button>
       </form>
       <div class="auth-security-note"><span aria-hidden="true">🔒</span><span>ระบบสำหรับเจ้าหน้าที่ที่ได้รับอนุญาต ข้อมูลผู้รับบริการจะแสดงตามสิทธิ์การใช้งาน</span></div>
-      <p id="page-loading" class="status-message" role="status" aria-live="polite" hidden></p><p id="page-error" class="error-message" role="alert" aria-live="assertive"></p>
     </section>
   </div>
+  <p id="page-loading" class="status-message" role="status" aria-live="polite" hidden></p><p id="page-error" class="error-message" role="alert" aria-live="assertive"></p>
 </main>
-<div id="toast-region" role="status" aria-live="polite" hidden></div><script type="module" src="js/auth.js"></script>
+<footer class="site-footer">Bangkok Hospital Hat Yai · Medication Reservation & Fulfillment</footer><div id="toast-region" role="status" aria-live="polite" hidden></div><script type="module" src="js/auth.js"></script>
 </body></html>
