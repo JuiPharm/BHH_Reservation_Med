@@ -105,3 +105,66 @@ test('source contains the verified current Drug Reservation Database header cont
     'OldValueJSON','NewValueJSON','Reason','SessionID','RequestID',
   ]) assert.match(source, new RegExp("'" + header + "'"));
 });
+
+
+test('provision reads SPREADSHEET_ID_V2 directly during the locked write phase', () => {
+  const spreadsheetId = '1FVKsANXa97QsXORrmcXbCmxaoCmpJFvvmhp5piKqcVA';
+  const secret = Buffer.alloc(32, 1).toString('base64url');
+  const loaded = load({ properties: {
+    SPREADSHEET_ID_V2: spreadsheetId,
+    V2_BOOTSTRAP_ENABLED: 'TRUE',
+    V2_BOOTSTRAP_ADMIN_PIN: 'TestPin123',
+    APP_SECRET: secret,
+  } });
+
+  // Deliberately omit spreadsheetId from preflight to reproduce the real failure
+  // that previously caused SpreadsheetApp.openById(undefined).
+  loaded.sandbox.inspectV2BootstrapConfig_ = () => ({
+    ok: true,
+    errors: [],
+    warnings: [],
+    alreadyProvisioned: false,
+    userId: 'USR-UAT-ADMIN-001',
+    staffId: 'ADMIN01',
+    staffName: 'UAT System Administrator',
+    departmentId: 'DEPT-PHARMACY',
+    role: 'SYSTEM_ADMIN',
+    accountStatus: 'PENDING',
+    version: 1,
+  });
+
+  let openedId = null;
+  loaded.sandbox.SpreadsheetApp.openById = (id) => {
+    openedId = id;
+    return { fake: true };
+  };
+  loaded.sandbox.requireV2Sheet_ = (_spreadsheet, name) => ({ name });
+  loaded.sandbox.assertV2DepartmentActive_ = () => {};
+  loaded.sandbox.findV2RowByValue_ = () => ({
+    rowNumber: 2,
+    record: {
+      UserID: 'USR-UAT-ADMIN-001',
+      StaffID: 'ADMIN01',
+      StaffName: 'UAT System Administrator',
+      DepartmentID: 'DEPT-PHARMACY',
+      Role: 'SYSTEM_ADMIN',
+      AccountStatus: 'PENDING',
+      Version: 1,
+      RegisteredAt: '2026-10-07T10:00:00.000Z',
+      CreatedAt: '2026-10-07T10:00:00.000Z',
+    },
+  });
+  loaded.sandbox.createV2BootstrapPinHash_ = () => 'HMAC-SHA256$v2$testsalt$testhash';
+  loaded.sandbox.upsertV2Record_ = () => 2;
+  loaded.sandbox.appendV2Audit_ = () => {};
+
+  const result = loaded.sandbox.provisionInitialV2Admin();
+
+  assert.equal(openedId, spreadsheetId);
+  assert.equal(result.success, true);
+  assert.equal(result.staffId, 'ADMIN01');
+  assert.equal(result.accountStatus, 'ACTIVE');
+  assert.equal(result.version, 2);
+  assert.equal(loaded.props.get('V2_BOOTSTRAP_ENABLED'), 'FALSE');
+  assert.equal(loaded.props.has('V2_BOOTSTRAP_ADMIN_PIN'), false);
+});
