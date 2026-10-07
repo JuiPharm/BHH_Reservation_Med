@@ -33,6 +33,7 @@ const API_ACTIONS_ = Object.freeze({
 });
 
 const GET_ACTIONS_ = Object.freeze({
+  HEALTH_V2: Object.freeze({ auth: false, mutates: false, handler: 'healthV2_', v2: true }),
   GET_APPOINTMENT_ACTION: Object.freeze({ auth: false, mutates: false, handler: 'getAppointmentAction_' }),
   GET_RESCHEDULE_REFERENCE: Object.freeze({ auth: false, mutates: false, handler: 'getRescheduleReference_' }),
 });
@@ -131,6 +132,7 @@ function resolveApiHandler_(name) {
 
 
 function invokeV2ApiAction_(actionName, context, request) {
+  if (actionName === 'HEALTH_V2') return healthV2_();
   if (actionName === 'LOGIN_V2') return loginV2_(request.payload, request.requestId);
   if (actionName === 'LOGOUT_V2') return logoutV2_(context);
   if (actionName === 'GET_V2_DASHBOARD') return getV2Dashboard_(context, request.payload);
