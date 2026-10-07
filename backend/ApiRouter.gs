@@ -1,6 +1,9 @@
 /** API registry is the single authorization boundary for every non-public action. */
 const API_ACTIONS_ = Object.freeze({
   LOGIN: Object.freeze({ auth: false, mutates: true, handler: 'login_' }),
+  LOGIN_V2: Object.freeze({ auth: false, mutates: true, handler: 'loginV2_', v2: true }),
+  LOGOUT_V2: Object.freeze({ auth: true, mutates: true, handler: 'logoutV2_', v2: true }),
+  GET_V2_DASHBOARD: Object.freeze({ auth: true, mutates: false, handler: 'getV2Dashboard_', v2: true }),
   LOGOUT: Object.freeze({ auth: true, mutates: true, handler: 'logout_' }),
   GET_MASTER_DATA: Object.freeze({ auth: true, mutates: false, handler: 'getMasterData_' }),
   GET_STAFF_DASHBOARD: Object.freeze({ auth: true, mutates: false, handler: 'getStaffDashboard_' }),
@@ -39,6 +42,17 @@ function routeApiRequest_(request, responseMetadata) {
   const action = actions[request.action];
   if (!action) throw new ApiError_('UNKNOWN_ACTION', 'Unsupported action.');
   if (request.method === 'GET' && action.mutates) throw new ApiError_('METHOD_NOT_ALLOWED', 'Unsupported action.');
+  if (action.v2) {
+    let v2Context = null;
+    if (action.auth) {
+      v2Context = requireV2Session_(request.sessionToken, { touch: true });
+      if (responseMetadata && typeof responseMetadata === 'object') {
+        responseMetadata.sessionExpiresAt = String(v2Context.expiresAt || '');
+      }
+    }
+    return invokeV2ApiAction_(request.action, v2Context, request);
+  }
+
   let context = null;
   if (action.auth) {
     context = requireSession_(request.sessionToken, { touch: true });
@@ -113,4 +127,12 @@ function resolveApiHandler_(name) {
   } catch (_ignored) {
     throw new ApiError_('NOT_IMPLEMENTED', 'This action is not available.');
   }
+}
+
+
+function invokeV2ApiAction_(actionName, context, request) {
+  if (actionName === 'LOGIN_V2') return loginV2_(request.payload, request.requestId);
+  if (actionName === 'LOGOUT_V2') return logoutV2_(context);
+  if (actionName === 'GET_V2_DASHBOARD') return getV2Dashboard_(context, request.payload);
+  throw new ApiError_('UNKNOWN_ACTION', 'Unsupported action.');
 }
