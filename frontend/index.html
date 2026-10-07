@@ -1,1 +1,21 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>BHH Medication Reservation</title><link rel="stylesheet" href="css/main.css"></head><body><main id="main-content" tabindex="-1"><section class="panel" style="max-width:760px;margin:7vh auto;text-align:center"><img src="assets/bdms-bhh-logo.svg" alt="โลโก้ระบบจองยาเฉพาะราย" style="width:min(420px,100%);height:auto"><p class="eyebrow" style="margin-top:1.5rem">Medication Reservation & Fulfillment</p><h1 class="page-title">ระบบจองยาเฉพาะราย</h1><p class="page-subtitle" style="margin-inline:auto">ระบบสำหรับเจ้าหน้าที่โรงพยาบาลกรุงเทพหาดใหญ่ เพื่อสร้างและติดตามคำขอจัดหายาสำหรับผู้รับบริการเฉพาะราย</p><p style="margin-top:1.25rem"><a href="login.html"><button type="button">เข้าสู่ระบบ</button></a></p></section></main><footer class="site-footer">Bangkok Hospital Hat Yai · Authorized staff only</footer><div id="toast-region" role="status" aria-live="polite" hidden></div><script type="module" src="js/auth.js"></script></body></html>
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>BHH Medication Reservation</title><link rel="stylesheet" href="css/main.css"></head>
+<body>
+<a class="skip-link" href="#main-content">ข้ามไปเนื้อหาหลัก</a>
+<header class="site-header"><div class="header-inner">
+  <a class="brand" href="index.html"><img class="brand-logo" src="assets/bdms-bhh-logo.svg" alt="โลโก้ระบบจองยาเฉพาะราย"><span class="brand-fallback" hidden>BHH Medication Reservation</span><span>BHH Medication Reservation</span></a>
+  <nav class="site-nav" aria-label="เมนูหลัก"><a href="login.html">เข้าสู่ระบบ</a><button type="button" class="secondary" data-action="logout">ออกจากระบบ</button></nav>
+  <div class="identity" aria-label="ข้อมูลผู้ใช้"><span id="identity-name">—</span><span id="identity-staff-id">—</span><span id="identity-department">—</span><span id="identity-role">—</span></div>
+</div></header>
+<main id="main-content" tabindex="-1">
+  <section class="panel" style="max-width:760px;margin:5vh auto;text-align:center">
+    <img src="assets/bdms-bhh-logo.svg" alt="โลโก้ระบบจองยาเฉพาะราย" style="width:min(420px,100%);height:auto">
+    <p class="eyebrow" style="margin-top:1.5rem">Medication Reservation & Fulfillment</p>
+    <h1 class="page-title">ระบบจองยาเฉพาะราย</h1>
+    <p class="page-subtitle" style="margin-inline:auto">ระบบสำหรับเจ้าหน้าที่โรงพยาบาลกรุงเทพหาดใหญ่ เพื่อสร้างและติดตามคำขอจัดหายาสำหรับผู้รับบริการเฉพาะราย</p>
+    <p style="margin-top:1.25rem"><a href="login.html"><button type="button">เข้าสู่ระบบ</button></a></p>
+  </section>
+  <p id="page-loading" class="status-message" role="status" aria-live="polite" hidden></p><p id="page-error" class="error-message" role="alert" aria-live="assertive"></p>
+</main>
+<footer class="site-footer">Bangkok Hospital Hat Yai · Medication Reservation & Fulfillment</footer><div id="toast-region" role="status" aria-live="polite" hidden></div><script type="module" src="js/auth.js"></script>
+</body></html>
