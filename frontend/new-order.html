@@ -1,10 +1,45 @@
 <!doctype html>
 <html lang="th">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>สร้างคำขอ | ระบบจองยาเฉพาะราย</title><link rel="stylesheet" href="css/main.css"><link rel="stylesheet" href="css/forms.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>สร้างคำขอ | BHH Medication Reservation</title><link rel="stylesheet" href="css/main.css"><link rel="stylesheet" href="css/forms.css"></head>
 <body data-requires-auth="true">
 <a class="skip-link" href="#main-content">ข้ามไปเนื้อหาหลัก</a>
-<header class="site-header"><div class="header-inner"><a class="brand" href="dashboard.html"><img class="brand-logo" src="assets/logo-placeholder.svg" alt="โลโก้ระบบจองยาเฉพาะราย"><span class="brand-fallback" hidden>ระบบจองยาเฉพาะราย</span><span>ระบบจองยาเฉพาะราย</span></a><nav class="site-nav" aria-label="เมนูหลัก"><a href="dashboard.html">แดชบอร์ด</a><a aria-current="page" href="new-order.html">สร้างคำขอ</a><button type="button" class="secondary" data-action="logout">ออกจากระบบ</button></nav><div class="identity" aria-label="ข้อมูลผู้ใช้"><span id="identity-name">—</span><span id="identity-staff-id">—</span><span id="identity-department">—</span><span id="identity-role">—</span></div></div></header>
-<main id="main-content" tabindex="-1"><section class="panel"><h1 class="page-title">สร้างคำขอจองยา</h1><form id="order-form" class="workflow-form" novalidate><div class="form-grid"><label>โทรศัพท์ผู้ติดต่อ<input name="RequesterPhone" type="tel" autocomplete="tel"></label><label>HN<input name="HN" inputmode="numeric" autocomplete="off" required><span data-field-error="HN" role="alert"></span></label><label>ชื่อผู้รับบริการ<input name="PatientName" autocomplete="off" required><span data-field-error="PatientName" role="alert"></span></label><label>หอผู้ป่วย/คลินิก<input name="WardClinic" autocomplete="off"></label><label>วันที่ต้องการ<input name="RequiredDate" type="date" required><span data-field-error="RequiredDate" role="alert"></span></label><label>ความสำคัญ<select name="Priority"></select><span data-field-error="Priority" role="alert"></span></label></div><fieldset><legend>รายการยา</legend><div data-medication-items class="medication-items"></div><button type="button" class="secondary" data-add-medication>เพิ่มรายการยา</button><span data-field-error="Items" role="alert"></span></fieldset><div class="form-actions"><button type="submit">ส่งคำขอ</button><a href="dashboard.html">ยกเลิก</a></div></form></section><p id="page-loading" class="status-message" role="status" aria-live="polite" hidden></p><p id="page-error" class="error-message" role="alert" aria-live="assertive"></p></main>
-<footer class="site-footer">ระบบสำหรับเจ้าหน้าที่ผู้ได้รับอนุญาตเท่านั้น</footer><div id="toast-region" role="status" aria-live="polite" hidden></div><script type="module" src="js/auth.js"></script><script type="module" src="js/order-form.js"></script>
-</body>
-</html>
+<header class="site-header"><div class="header-inner">
+  <a class="brand" href="dashboard.html"><img class="brand-logo" src="assets/bdms-bhh-logo.svg" alt="Bangkok Hospital Hat Yai Medication Reservation"><span class="brand-fallback" hidden>BHH Medication Reservation</span><span>BHH Medication Reservation</span></a>
+  <nav class="site-nav" aria-label="เมนูหลัก">
+    <a href="dashboard.html">คิวงาน</a>
+    <a aria-current="page" href="new-order.html">สร้างคำขอ</a>
+    <a href="admin.html" data-admin-only>ศูนย์เภสัชกรรม</a>
+    <button type="button" class="secondary" data-action="logout">ออกจากระบบ</button>
+  </nav>
+  <div class="identity" aria-label="ข้อมูลผู้ใช้"><span id="identity-name">—</span><span id="identity-staff-id">—</span><span id="identity-department">—</span><span id="identity-role">—</span></div>
+</div></header>
+<main id="main-content" tabindex="-1">
+<section class="panel">
+  <div class="page-hero"><div><p class="eyebrow">New Reservation Request</p><h1 class="page-title">สร้างคำขอจองยาเฉพาะราย</h1><p class="page-subtitle">กรอกข้อมูลผู้รับบริการ วันที่ต้องการรับยา และรายการยา ระบบจะผูกผู้ขอกับบัญชีที่เข้าสู่ระบบโดยอัตโนมัติ</p></div></div>
+  <form id="order-form" class="workflow-form" novalidate>
+    <fieldset><legend>1. ข้อมูลผู้รับบริการและผู้ติดต่อ</legend>
+      <div class="form-grid">
+        <label>HN<input name="HN" inputmode="numeric" autocomplete="off" required placeholder="07-00-000000"><span class="field-help">รูปแบบ 07-XX-XXXXXX</span><span data-field-error="HN" role="alert"></span></label>
+        <label>ชื่อผู้รับบริการ<input name="PatientName" autocomplete="off" required><span data-field-error="PatientName" role="alert"></span></label>
+        <label>หอผู้ป่วย / คลินิก<input name="WardClinic" autocomplete="off" placeholder="เช่น OPD Oncology"></label>
+        <label>โทรศัพท์ผู้ติดต่อ<input name="RequesterPhone" type="tel" autocomplete="tel"><span class="field-help">เบอร์ติดต่อของผู้ประสานงานสำหรับคำขอนี้</span></label>
+      </div>
+    </fieldset>
+    <fieldset><legend>2. ความต้องการและกำหนดรับยา</legend>
+      <div class="form-grid">
+        <label>วันที่ต้องการรับยา<input name="RequiredDate" type="date" required><span class="field-help">วันที่ต้องการให้กระบวนการจัดหายาแล้วเสร็จ/พร้อมรับตาม workflow ปัจจุบัน</span><span data-field-error="RequiredDate" role="alert"></span></label>
+        <label>ความสำคัญ<select name="Priority"></select><span data-field-error="Priority" role="alert"></span></label>
+      </div>
+    </fieldset>
+    <fieldset><legend>3. รายการยา</legend>
+      <p class="form-section-note">สามารถเพิ่มหลายรายการในคำขอเดียวกันได้ โปรดตรวจสอบชื่อยา ความแรง จำนวน และแพทย์ผู้สั่งใช้ก่อนส่ง</p>
+      <div data-medication-items class="medication-items"></div>
+      <button type="button" class="secondary" data-add-medication>+ เพิ่มรายการยา</button><span data-field-error="Items" role="alert"></span>
+    </fieldset>
+    <div class="form-actions"><button type="submit">ส่งคำขอจองยา</button><a href="dashboard.html">กลับคิวงาน</a></div>
+  </form>
+</section>
+<p id="page-loading" class="status-message" role="status" aria-live="polite" hidden></p><p id="page-error" class="error-message" role="alert" aria-live="assertive"></p>
+</main>
+<footer class="site-footer">Bangkok Hospital Hat Yai · Medication Reservation & Fulfillment</footer><div id="toast-region" role="status" aria-live="polite" hidden></div><script type="module" src="js/auth.js"></script><script type="module" src="js/order-form.js"></script>
+</body></html>
