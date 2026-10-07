@@ -1,0 +1,27 @@
+name: V2 bootstrap checks
+
+on:
+  pull_request:
+    paths:
+      - 'backend/V2UserBootstrapService.gs'
+      - 'backend/V2Repository.gs'
+      - 'backend/V2AuthService.gs'
+      - 'backend/V2SessionService.gs'
+      - 'backend/V2DashboardService.gs'
+      - 'backend/ApiRouter.gs'
+      - 'tests/backend/v2-user-bootstrap.test.js'
+      - '.github/workflows/v2-bootstrap-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  v2-bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run v2 bootstrap tests
+        run: node --test tests/backend/v2-user-bootstrap.test.js
