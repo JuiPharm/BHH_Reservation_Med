@@ -4,7 +4,7 @@
 <body data-requires-auth="true">
 <a class="skip-link" href="#main-content">ข้ามไปเนื้อหาหลัก</a>
 <header class="site-header"><div class="header-inner">
-  <a class="brand" href="dashboard.html"><img class="brand-logo" src="assets/bdms-bhh-logo.svg" alt="Bangkok Hospital Hat Yai Medication Reservation"><span class="brand-fallback" hidden>BHH Medication Reservation</span><span>BHH Medication Reservation</span></a>
+  <a class="brand" href="dashboard.html"><img class="brand-logo" src="assets/bdms-bhh-logo.svg" alt="โลโก้ระบบจองยาเฉพาะราย"><span class="brand-fallback" hidden>BHH Medication Reservation</span><span>BHH Medication Reservation</span></a>
   <nav class="site-nav" aria-label="เมนูหลัก">
     <a href="dashboard.html">คิวงาน</a>
     <a aria-current="page" href="new-order.html">สร้างคำขอ</a>
@@ -19,7 +19,7 @@
   <form id="order-form" class="workflow-form" novalidate>
     <fieldset><legend>1. ข้อมูลผู้รับบริการและผู้ติดต่อ</legend>
       <div class="form-grid">
-        <label>HN<input name="HN" inputmode="numeric" autocomplete="off" required placeholder="07-00-000000"><span class="field-help">รูปแบบ 07-XX-XXXXXX</span><span data-field-error="HN" role="alert"></span></label>
+        <label>HN<input name="HN" inputmode="numeric" autocomplete="off" required placeholder="07-XX-XXXXXX"><span class="field-help">รูปแบบ 07-XX-XXXXXX</span><span data-field-error="HN" role="alert"></span></label>
         <label>ชื่อผู้รับบริการ<input name="PatientName" autocomplete="off" required><span data-field-error="PatientName" role="alert"></span></label>
         <label>หอผู้ป่วย / คลินิก<input name="WardClinic" autocomplete="off" placeholder="เช่น OPD Oncology"></label>
         <label>โทรศัพท์ผู้ติดต่อ<input name="RequesterPhone" type="tel" autocomplete="tel"><span class="field-help">เบอร์ติดต่อของผู้ประสานงานสำหรับคำขอนี้</span></label>
