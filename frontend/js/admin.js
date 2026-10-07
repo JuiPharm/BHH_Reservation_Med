@@ -1,6 +1,7 @@
 import { apiRequest, createRequestId } from './api.js';
 import { loadOrderDetail, renderOrderSummary } from './order-detail.js';
 import { requireAuth } from './session.js';
+import { statusLabel, statusTone } from './status-meta.js';
 import { confirmAction, setLoading, showFieldErrors, showToast } from './ui.js';
 
 const AMBIGUOUS_FAILURES = new Set(['NETWORK_ERROR', 'REQUEST_TIMEOUT', 'HTTP_ERROR', 'INVALID_RESPONSE']);
@@ -196,7 +197,18 @@ function textCell(value, label) {
 
 function renderAdminOrders(container, orders) {
   container.replaceChildren();
-  (orders || []).forEach((order) => {
+  const rows = Array.isArray(orders) ? orders : [];
+  if (!rows.length) {
+    const row = document.createElement('tr');
+    row.className = 'empty-row';
+    const cell = document.createElement('td');
+    cell.colSpan = 5;
+    cell.textContent = 'ยังไม่มีคำขอที่ตรงกับเงื่อนไขนี้';
+    row.append(cell);
+    container.append(row);
+    return;
+  }
+  rows.forEach((order) => {
     const row = document.createElement('tr');
     const link = document.createElement('a');
     link.className = 'order-link';
@@ -205,7 +217,22 @@ function renderAdminOrders(container, orders) {
     const id = document.createElement('td');
     id.append(link);
     id.dataset.label = 'เลขที่คำขอ';
-    row.append(id, textCell(order.Department, 'หน่วยงาน'), textCell(order.Status, 'สถานะ'), textCell(order.RequiredDate, 'วันนัด'), textCell(order.ItemCount, 'รายการ'));
+
+    const statusCell = document.createElement('td');
+    statusCell.dataset.label = 'สถานะ';
+    const rawStatus = String(order.Status || '');
+    const badge = document.createElement('span');
+    badge.className = `status-badge tone-${statusTone(rawStatus)} ${rawStatus.toLowerCase()}`;
+    badge.textContent = statusLabel(rawStatus);
+    statusCell.append(badge);
+
+    row.append(
+      id,
+      textCell(order.Department, 'หน่วยงาน'),
+      statusCell,
+      textCell(order.RequiredDate, 'วันที่ต้องการรับยา'),
+      textCell(order.ItemCount, 'รายการ'),
+    );
     container.append(row);
   });
 }

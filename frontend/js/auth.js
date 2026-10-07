@@ -2,12 +2,19 @@ import { apiRequest } from './api.js';
 import { clearSession, getSession, loginSuccessDestination, requireAuth, saveSession } from './session.js';
 import { clearFieldError, setLoading, showFieldErrors, showToast } from './ui.js';
 
+function roleLabel(role) {
+  const value = String(role || '').toUpperCase();
+  if (value === 'ADMIN') return 'ผู้ดูแลระบบ';
+  if (value === 'STAFF') return 'เจ้าหน้าที่';
+  return role || '—';
+}
+
 function renderIdentity(session) {
   const values = {
     'identity-name': session && session.fullName,
     'identity-staff-id': session && session.staffId,
     'identity-department': session && session.department,
-    'identity-role': session && session.role,
+    'identity-role': session && roleLabel(session.role),
   };
   for (const [id, value] of Object.entries(values)) {
     const element = document.getElementById(id);
@@ -15,12 +22,19 @@ function renderIdentity(session) {
   }
 }
 
+function installRoleAwareNavigation(session) {
+  const role = String(session && session.role || '').toUpperCase();
+  document.querySelectorAll('[data-admin-only]').forEach((node) => {
+    node.hidden = role !== 'ADMIN';
+  });
+}
+
 async function logout() {
   const session = getSession();
   try {
     if (session) await apiRequest('LOGOUT', {});
   } catch (_error) {
-    // Clearing the local session remains safe when an offline logout cannot reach the server.
+    // Local sign-out still proceeds if the network is unavailable.
   } finally {
     clearSession();
     window.location.replace('login.html');
@@ -48,12 +62,9 @@ function installLogin() {
       return;
     }
     submit.disabled = true;
-    setLoading(loading, true, 'กำลังตรวจสอบข้อมูลเข้าสู่ระบบ');
+    setLoading(loading, true, 'กำลังตรวจสอบสิทธิ์เข้าใช้งาน');
     try {
-      const result = await apiRequest('LOGIN', {
-        staffId,
-        pin,
-      });
+      const result = await apiRequest('LOGIN', { staffId, pin });
       saveSession(result);
       showFieldErrors({}, form);
       window.location.replace(loginSuccessDestination());
@@ -88,6 +99,7 @@ function initialize() {
   const roles = (body.dataset.roles || '').split(',').filter(Boolean);
   const session = body.dataset.requiresAuth === 'true' ? requireAuth({ roles }) : getSession();
   renderIdentity(session);
+  installRoleAwareNavigation(session);
   installLogoFallbacks();
   installLogin();
   installLogout();

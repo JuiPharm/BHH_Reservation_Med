@@ -1,4 +1,5 @@
 import { apiRequest } from './api.js';
+import { statusLabel, statusMeta, statusTone } from './status-meta.js';
 import { setLoading, showToast } from './ui.js';
 
 const BANGKOK_TIME = 'Asia/Bangkok';
@@ -7,6 +8,14 @@ export function formatBangkokTime(value) {
   const time = new Date(value);
   if (!Number.isFinite(time.getTime())) return '—';
   return new Intl.DateTimeFormat('th-TH', { timeZone: BANGKOK_TIME, dateStyle: 'medium', timeStyle: 'short' }).format(time);
+}
+
+export function formatReservationDate(value) {
+  const text = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return text || '—';
+  const time = new Date(text + 'T00:00:00+07:00');
+  if (!Number.isFinite(time.getTime())) return text;
+  return new Intl.DateTimeFormat('th-TH', { timeZone: BANGKOK_TIME, dateStyle: 'medium' }).format(time);
 }
 
 export async function loadDashboard(filters = {}, request = apiRequest) {
@@ -42,66 +51,92 @@ export function nextPage(result) {
 function textCell(value, label) {
   const cell = document.createElement('td');
   cell.dataset.label = label;
-  cell.textContent = String(value == null ? '—' : value);
+  cell.textContent = String(value == null || value === '' ? '—' : value);
   return cell;
 }
 
 function renderOrders(container, orders) {
   container.replaceChildren();
-  (orders || []).forEach((order) => {
+  const rows = Array.isArray(orders) ? orders : [];
+  if (!rows.length) {
     const row = document.createElement('tr');
+    row.className = 'empty-row';
+    const cell = document.createElement('td');
+    cell.colSpan = 7;
+    cell.textContent = 'ยังไม่มีคำขอที่ตรงกับเงื่อนไขนี้';
+    row.append(cell);
+    container.append(row);
+    return;
+  }
+
+  rows.forEach((order) => {
+    const row = document.createElement('tr');
+
     const link = document.createElement('a');
     link.className = 'order-link';
     link.href = `order-detail.html?orderId=${encodeURIComponent(String(order.OrderID || ''))}`;
     link.textContent = String(order.OrderID || '—');
+    const primary = document.createElement('div');
+    primary.className = 'table-primary';
+    primary.append(link);
+    if (order.PatientName) {
+      const patient = document.createElement('small');
+      patient.textContent = String(order.PatientName);
+      primary.append(patient);
+    }
     const idCell = document.createElement('td');
-    idCell.append(link);
     idCell.dataset.label = 'เลขที่คำขอ';
+    idCell.append(primary);
 
     const statusCell = document.createElement('td');
     statusCell.dataset.label = 'สถานะ';
-    const statusBadge = document.createElement('span');
-    const st = String(order.Status || '').toLowerCase();
-    statusBadge.className = `status-badge ${st}`;
-    statusBadge.textContent = order.Status || '—';
-    statusCell.append(statusBadge);
+    const badge = document.createElement('span');
+    const rawStatus = String(order.Status || '');
+    badge.className = `status-badge tone-${statusTone(rawStatus)} ${rawStatus.toLowerCase()}`;
+    badge.textContent = statusLabel(rawStatus);
+    statusCell.append(badge);
 
-    const deptCell = textCell(order.Department || '—', 'หน่วยงาน');
-
-    row.append(idCell, deptCell, statusCell, textCell(order.Priority, 'ความสำคัญ'), textCell(order.ItemCount, 'รายการ'), textCell(formatBangkokTime(order.CreatedAt), 'สร้างเมื่อ'));
+    row.append(
+      idCell,
+      textCell(order.WardClinic, 'หอผู้ป่วย / คลินิก'),
+      statusCell,
+      textCell(formatReservationDate(order.RequiredDate), 'วันที่ต้องการรับยา'),
+      textCell(order.Priority, 'ความสำคัญ'),
+      textCell(order.ItemCount, 'จำนวนรายการ'),
+      textCell(formatBangkokTime(order.CreatedAt), 'สร้างเมื่อ'),
+    );
     container.append(row);
   });
 }
 
 function renderCounts(container, statusCounts, update) {
   container.replaceChildren();
-  const statusLabels = {
-    SUBMITTED: 'ยื่นคำขอแล้ว',
-    RECEIVED: 'รับยาแล้ว',
-    PARTIALLY_RECEIVED: 'รับยาบางส่วน',
-    CANCEL_REQUESTED: 'ขอยกเลิก',
-    CANCELLED: 'ยกเลิกแล้ว',
-    NOTIFIED: 'แจ้งเตือนแล้ว',
-  };
+  Object.entries(statusCounts || {})
+    .sort(([a], [b]) => statusLabel(a).localeCompare(statusLabel(b), 'th'))
+    .forEach(([status, count]) => {
+      const meta = statusMeta(status);
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = `status-card tone-${meta.tone}`;
+      card.dataset.status = status;
+      card.setAttribute('aria-label', `${meta.label} ${count} รายการ`);
 
-  Object.entries(statusCounts || {}).forEach(([status, count]) => {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'status-card';
-    card.dataset.status = status;
+      const label = document.createElement('span');
+      label.className = 'status-card-label';
+      label.textContent = meta.label;
 
-    const label = document.createElement('span');
-    label.className = 'status-card-label';
-    label.textContent = statusLabels[status] || status;
+      const num = document.createElement('span');
+      num.className = 'status-card-count';
+      num.textContent = String(count);
 
-    const num = document.createElement('span');
-    num.className = 'status-card-count';
-    num.textContent = count;
+      const hint = document.createElement('span');
+      hint.className = 'status-card-hint';
+      hint.textContent = meta.hint || 'แตะเพื่อดูรายการ';
 
-    card.append(label, num);
-    bindStatusCard(card, update);
-    container.append(card);
-  });
+      card.append(label, num, hint);
+      bindStatusCard(card, update);
+      container.append(card);
+    });
 }
 
 function renderStatusOptions(select, statusCounts, selected) {
@@ -110,13 +145,15 @@ function renderStatusOptions(select, statusCounts, selected) {
   all.value = '';
   all.textContent = 'ทุกสถานะ';
   select.append(all);
-  Object.keys(statusCounts || {}).forEach((status) => {
-    const option = document.createElement('option');
-    option.value = status;
-    option.textContent = status;
-    option.selected = status === selected;
-    select.append(option);
-  });
+  Object.keys(statusCounts || {})
+    .sort((a, b) => statusLabel(a).localeCompare(statusLabel(b), 'th'))
+    .forEach((status) => {
+      const option = document.createElement('option');
+      option.value = status;
+      option.textContent = statusLabel(status);
+      option.selected = status === selected;
+      select.append(option);
+    });
 }
 
 async function initialize() {
@@ -132,8 +169,9 @@ async function initialize() {
   const following = document.getElementById('dashboard-next');
   let query = { filters: {}, search: '', sort: 'CreatedAt:desc', page: 1 };
   let current = { page: 1, pageSize: 25, total: 0 };
+
   const render = async () => {
-    setLoading(loading, true, 'กำลังโหลดแดชบอร์ด');
+    setLoading(loading, true, 'กำลังโหลดคิวงานจองยา');
     try {
       const data = await loadDashboard(query);
       current = {
@@ -142,20 +180,40 @@ async function initialize() {
         pageSize: Number(data && data.pageSize) || 25,
         total: Number(data && data.total) || Number(data && data.totalOrders) || 0,
       };
-      renderCounts(countCards, data.statusCounts, (filters) => { query = { ...query, filters, page: 1 }; status.value = filters.Status; render(); });
+      renderCounts(countCards, data.statusCounts, (filters) => {
+        query = { ...query, filters, page: 1 };
+        status.value = filters.Status;
+        render();
+      });
       renderStatusOptions(status, data.statusCounts, query.filters.Status || '');
       renderOrders(orderRows, data.recentOrders);
       pageLabel.textContent = `หน้า ${current.page || query.page}`;
       previous.disabled = (current.page || query.page) <= 1;
       following.disabled = nextPage(current) === (current.page || query.page);
-    } catch (error) { showToast(error.message || 'ไม่สามารถโหลดแดชบอร์ดได้', 'error'); }
-    finally { setLoading(loading, false); }
+    } catch (error) {
+      showToast(error.message || 'ไม่สามารถโหลดคิวงานจองยาได้', 'error');
+    } finally {
+      setLoading(loading, false);
+    }
   };
-  const debounced = createSearchDebouncer((value) => { query = { ...query, search: value, page: 1 }; render(); });
+
+  const debounced = createSearchDebouncer((value) => {
+    query = { ...query, search: value, page: 1 };
+    render();
+  });
   search.addEventListener('input', () => debounced(search.value));
-  status.addEventListener('change', () => { query = { ...query, filters: status.value ? { Status: status.value } : {}, page: 1 }; render(); });
-  previous.addEventListener('click', () => { query = { ...query, page: Math.max(1, (current.page || query.page) - 1) }; render(); });
-  following.addEventListener('click', () => { query = { ...query, page: nextPage(current) }; render(); });
+  status.addEventListener('change', () => {
+    query = { ...query, filters: status.value ? { Status: status.value } : {}, page: 1 };
+    render();
+  });
+  previous.addEventListener('click', () => {
+    query = { ...query, page: Math.max(1, (current.page || query.page) - 1) };
+    render();
+  });
+  following.addEventListener('click', () => {
+    query = { ...query, page: nextPage(current) };
+    render();
+  });
   render();
 }
 
