@@ -7,9 +7,13 @@ export function createMedicationItem(initial = {}) {
   return {
     clientKey: typeof item.clientKey === 'string' && item.clientKey ? item.clientKey : createRequestId(),
     ...(typeof item.OrderItemID === 'string' && item.OrderItemID ? { OrderItemID: item.OrderItemID } : {}),
-    GenericName: String(item.GenericName || ''), BrandName: String(item.BrandName || ''), Strength: String(item.Strength || ''),
-    DosageForm: String(item.DosageForm || ''), RequestedQuantity: item.RequestedQuantity == null ? '' : String(item.RequestedQuantity),
-    Unit: String(item.Unit || ''), Prescriber: String(item.Prescriber || ''),
+    GenericName: String(item.GenericName || ''),
+    BrandName: String(item.BrandName || ''),
+    Strength: String(item.Strength || ''),
+    DosageForm: String(item.DosageForm || ''),
+    RequestedQuantity: item.RequestedQuantity == null ? '' : String(item.RequestedQuantity),
+    Unit: String(item.Unit || ''),
+    Prescriber: String(item.Prescriber || ''),
   };
 }
 
@@ -48,9 +52,25 @@ function inputFor(field, item, masterData) {
     (masterData[type] || []).forEach((entry) => option(input, entry, String(item[field] || '')));
   } else {
     input.value = String(item[field] || '');
-    if (field === 'RequestedQuantity') { input.type = 'number'; input.min = '0.01'; input.step = 'any'; }
+    if (field === 'RequestedQuantity') {
+      input.type = 'number';
+      input.min = '0.01';
+      input.step = 'any';
+      input.placeholder = 'จำนวนที่ต้องการ';
+    }
+    if (field === 'GenericName') input.placeholder = 'เช่น Trastuzumab';
+    if (field === 'BrandName') input.placeholder = 'ชื่อการค้า (ถ้ามี)';
+    if (field === 'Strength') input.placeholder = 'เช่น 440 mg/vial';
+    if (field === 'Prescriber') input.placeholder = 'แพทย์ผู้สั่งใช้';
   }
   return input;
+}
+
+function refreshLegends(container) {
+  Array.from(container.querySelectorAll('[data-medication-item]')).forEach((row, index) => {
+    const legend = row.querySelector('legend');
+    if (legend) legend.textContent = `รายการยา ${index + 1}`;
+  });
 }
 
 export function appendMedicationItem(container, initial, masterData = {}, options = {}) {
@@ -60,14 +80,22 @@ export function appendMedicationItem(container, initial, masterData = {}, option
   row.dataset.medicationItem = 'true';
   row.dataset.clientKey = item.clientKey;
   if (item.OrderItemID) row.dataset.orderItemId = item.OrderItemID;
+
   const legend = document.createElement('legend');
   legend.textContent = 'รายการยา';
   row.append(legend);
+
   FIELDS.forEach((field) => {
     const label = document.createElement('label');
     const input = inputFor(field, item, masterData);
     label.htmlFor = input.id;
-    label.textContent = field === 'GenericName' ? 'ชื่อสามัญ' : field === 'BrandName' ? 'ชื่อการค้า' : field === 'Strength' ? 'ความแรง' : field === 'DosageForm' ? 'รูปแบบยา' : field === 'RequestedQuantity' ? 'จำนวน' : field === 'Unit' ? 'หน่วย' : 'ผู้สั่งใช้ยา';
+    label.textContent = field === 'GenericName' ? 'ชื่อสามัญ'
+      : field === 'BrandName' ? 'ชื่อการค้า'
+      : field === 'Strength' ? 'ความแรง'
+      : field === 'DosageForm' ? 'รูปแบบยา'
+      : field === 'RequestedQuantity' ? 'จำนวนที่ต้องการ'
+      : field === 'Unit' ? 'หน่วย'
+      : 'แพทย์ผู้สั่งใช้';
     label.append(input);
     const error = document.createElement('span');
     error.dataset.medicationFieldError = field;
@@ -75,13 +103,20 @@ export function appendMedicationItem(container, initial, masterData = {}, option
     label.append(error);
     row.append(label);
   });
+
   const remove = document.createElement('button');
   remove.type = 'button';
   remove.className = 'secondary';
-  remove.textContent = 'ลบรายการ';
-  remove.addEventListener('click', () => { if (container.querySelectorAll('[data-medication-item]').length > 1) row.remove(); });
+  remove.textContent = 'ลบรายการนี้';
+  remove.addEventListener('click', () => {
+    if (container.querySelectorAll('[data-medication-item]').length > 1) {
+      row.remove();
+      refreshLegends(container);
+    }
+  });
   if (options.lockPersisted && item.OrderItemID) remove.hidden = true;
   row.append(remove);
   container.append(row);
+  refreshLegends(container);
   return row;
 }
