@@ -6,6 +6,11 @@ const vm = require('node:vm');
 
 const sourcePath = path.resolve(__dirname, '../../backend/V2UserBootstrapService.gs');
 const source = fs.readFileSync(sourcePath, 'utf8');
+const v2AuthSource = fs.readFileSync(path.resolve(__dirname, '../../backend/V2AuthService.gs'), 'utf8');
+const v2SessionSource = fs.readFileSync(path.resolve(__dirname, '../../backend/V2SessionService.gs'), 'utf8');
+const v2RepositorySource = fs.readFileSync(path.resolve(__dirname, '../../backend/V2Repository.gs'), 'utf8');
+const v2DashboardSource = fs.readFileSync(path.resolve(__dirname, '../../backend/V2DashboardService.gs'), 'utf8');
+const apiRouterSource = fs.readFileSync(path.resolve(__dirname, '../../backend/ApiRouter.gs'), 'utf8');
 
 function load(overrides = {}) {
   const props = new Map(Object.entries(overrides.properties || {}));
@@ -167,4 +172,45 @@ test('provision reads SPREADSHEET_ID_V2 directly during the locked write phase',
   assert.equal(result.version, 2);
   assert.equal(loaded.props.get('V2_BOOTSTRAP_ENABLED'), 'FALSE');
   assert.equal(loaded.props.has('V2_BOOTSTRAP_ADMIN_PIN'), false);
+});
+
+
+test('v2 runtime uses the v2 spreadsheet and never falls back to the v1 SPREADSHEET_ID', () => {
+  assert.match(v2RepositorySource, /getProperty\('SPREADSHEET_ID_V2'\)/);
+  assert.doesNotMatch(v2RepositorySource, /getProperty\('SPREADSHEET_ID'\)/);
+  assert.match(v2AuthSource, /readV2Records_\('T_Users'/);
+  assert.match(v2SessionSource, /readV2Records_\('S_Sessions'/);
+  assert.match(v2DashboardSource, /readV2Records_\('T_Reservations'/);
+});
+
+test('v2 login and session functions are wired into ApiRouter without replacing v1 LOGIN', () => {
+  assert.match(apiRouterSource, /LOGIN:\s*Object\.freeze\(\{ auth: false, mutates: true, handler: 'login_' \}\)/);
+  assert.match(apiRouterSource, /LOGIN_V2:\s*Object\.freeze\(\{[^}]*v2:\s*true/);
+  assert.match(apiRouterSource, /LOGOUT_V2:\s*Object\.freeze\(\{[^}]*v2:\s*true/);
+  assert.match(apiRouterSource, /GET_V2_DASHBOARD:\s*Object\.freeze\(\{[^}]*v2:\s*true/);
+  assert.match(apiRouterSource, /if \(action\.v2\)/);
+  assert.match(apiRouterSource, /requireV2Session_\(request\.sessionToken/);
+});
+
+test('v2 login verifies bootstrap-compatible HMAC-SHA256 v2 hashes', () => {
+  assert.match(v2AuthSource, /HMAC-SHA256\$v2\$/);
+  assert.match(v2AuthSource, /MEDICATION_RESERVATION_PIN_V2\\u0000/);
+  assert.match(v2AuthSource, /Utilities\.computeHmacSha256Signature/);
+  assert.match(v2AuthSource, /PropertiesService\.getScriptProperties\(\)\.getProperty\('APP_SECRET'\)/);
+  assert.match(v2AuthSource, /function v2ConstantTimeEqual_/);
+});
+
+test('v2 session stores only TokenHash and supports revoke and expiry', () => {
+  assert.match(v2SessionSource, /TokenHash:\s*tokenHash/);
+  assert.doesNotMatch(v2SessionSource, /RawToken:/);
+  assert.match(v2SessionSource, /Revoked:\s*false/);
+  assert.match(v2SessionSource, /SESSION_EXPIRED/);
+  assert.match(v2SessionSource, /RevokeReason:\s*'USER_LOGOUT'/);
+});
+
+test('v2 dashboard exposes the compatibility fields required by the current frontend', () => {
+  for (const field of ['OrderID','PatientName','WardClinic','Status','RequiredDate','ItemCount','CreatedAt']) {
+    assert.match(v2DashboardSource, new RegExp(field));
+  }
+  assert.match(v2DashboardSource, /apiVersion:\s*'v2'/);
 });
