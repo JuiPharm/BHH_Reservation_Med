@@ -970,7 +970,13 @@ function assertEmailRetryCompatible_(sourceLog, snapshot, header) {
   if (!statusCompatible || Number(header.Version) !== expectedVersion || !markerCompatible) throw new ApiError_('EMAIL_RETRY_STALE', 'The order changed after this email attempt and cannot be retried.');
 }
 
-function requireAdminOrderContext_(context) { if (!context || !context.user || String(context.user.Role || '').toUpperCase() !== 'ADMIN') throw new ApiError_('ACCESS_DENIED', 'Access denied.'); return context; }
+function requireAdminOrderContext_(context) {
+  const role = context && context.user ? String(context.user.Role || '').toUpperCase() : '';
+  if (!context || !context.user || (role !== 'ADMIN' && role !== 'SYSTEM_ADMIN' && role !== 'PHARMACY_MANAGER')) {
+    throw new ApiError_('ACCESS_DENIED', 'Access denied.');
+  }
+  return context;
+}
 function adminOrderSummary_(record) { return { OrderID: String(record.OrderID || ''), CreatedAt: record.CreatedAt || '', Department: String(record.Department || ''), WardClinic: String(record.WardClinic || ''), RequiredDate: String(record.RequiredDate || ''), Priority: String(record.Priority || ''), Status: String(record.Status || ''), ItemCount: Number(record.ItemCount || 0), Version: Number(record.Version || 0) }; }
 function currentDepartmentForCache_(model) { return model && model.header ? model.header.Department : ''; }
 function emailTextForOrder_(value) { return String(value == null ? '' : value).trim(); }
