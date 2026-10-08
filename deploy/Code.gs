@@ -5443,11 +5443,21 @@ function getV2Dashboard_(context, payload) {
   const total = reservations.length;
   const start = (requestedPage - 1) * pageSize;
   const pageRows = reservations.slice(start, start + pageSize);
-  const itemCounts = readV2Records_('T_ReservationItems').reduce(function (counts, item) {
-    const id = String(item.ReservationID || '');
-    if (id) counts[id] = (counts[id] || 0) + 1;
-    return counts;
-  }, {});
+  const itemCounts = {};
+  if (pageRows.length > 0) {
+    const itemsSheet = getV2SheetOrThrow_('T_ReservationItems');
+    if (itemsSheet.getLastRow() >= 2) {
+      const pageIds = {};
+      pageRows.forEach(function (r) { pageIds[String(r.ReservationID || '')] = true; });
+      const items = readV2Records_('T_ReservationItems', {
+        predicate: function (item) { return Boolean(pageIds[String(item.ReservationID || '')]); },
+      });
+      items.forEach(function (item) {
+        const id = String(item.ReservationID || '');
+        if (id) itemCounts[id] = (itemCounts[id] || 0) + 1;
+      });
+    }
+  }
 
   const recentOrders = reportOnly ? [] : pageRows.map(function (row) {
     const id = String(row.ReservationID || '');
@@ -5573,36 +5583,66 @@ function diagnoseV2_() {
 /**
  * Repository helpers for the Drug Reservation Database (v2).
  * These functions never read SPREADSHEET_ID / the v1 database.
+ * Includes per-execution memoization and CacheService caching for high performance.
  */
+
+var cachedV2Spreadsheet_ = null;
+var cachedV2Sheets_ = {};
+var cachedV2HeaderMaps_ = {};
+
 function openV2Spreadsheet_() {
+  if (cachedV2Spreadsheet_) return cachedV2Spreadsheet_;
   const id = String(PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID_V2') || '').trim();
   if (!id) throw new Error('SPREADSHEET_ID_V2 is not configured.');
-  return SpreadsheetApp.openById(id);
+  cachedV2Spreadsheet_ = SpreadsheetApp.openById(id);
+  return cachedV2Spreadsheet_;
 }
 
 function getV2SheetOrThrow_(sheetName) {
+  if (cachedV2Sheets_[sheetName]) return cachedV2Sheets_[sheetName];
   const sheet = openV2Spreadsheet_().getSheetByName(sheetName);
   if (!sheet) throw new Error('Unknown v2 sheet: ' + sheetName);
+  cachedV2Sheets_[sheetName] = sheet;
   return sheet;
 }
 
 function getV2HeaderMap_(sheet) {
+  const name = sheet.getName();
+  if (cachedV2HeaderMaps_[name]) return cachedV2HeaderMaps_[name];
   const lastColumn = sheet.getLastColumn();
-  if (!lastColumn) throw new Error('V2 sheet has no headers: ' + sheet.getName());
+  if (!lastColumn) throw new Error('V2 sheet has no headers: ' + name);
   const headers = sheet.getRange(1, 1, 1, lastColumn).getDisplayValues()[0];
-  return headers.reduce(function (map, header, index) {
+  const map = headers.reduce(function (res, header, index) {
     const key = String(header || '').trim();
-    if (key) map[key] = index + 1;
-    return map;
+    if (key) res[key] = index + 1;
+    return res;
   }, {});
+  cachedV2HeaderMaps_[name] = map;
+  return map;
 }
 
 function readV2Records_(sheetName, options) {
+  if (sheetName === 'M_Departments') {
+    try {
+      const cache = CacheService.getScriptCache();
+      const cached = cache.get('v2_depts');
+      if (cached) {
+        let depts = JSON.parse(cached);
+        if (options && typeof options.predicate === 'function') depts = depts.filter(options.predicate);
+        if (options && Object.prototype.hasOwnProperty.call(options, 'limit')) {
+          depts = depts.slice(0, Math.max(0, Number(options.limit) || 0));
+        }
+        return depts;
+      }
+    } catch (_ignored) {}
+  }
+
   const sheet = getV2SheetOrThrow_(sheetName);
   const headers = getV2HeaderMap_(sheet);
   const names = Object.keys(headers);
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
+
   const values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
   let records = values.map(function (row) {
     return names.reduce(function (record, name) {
@@ -5610,6 +5650,13 @@ function readV2Records_(sheetName, options) {
       return record;
     }, {});
   });
+
+  if (sheetName === 'M_Departments') {
+    try {
+      CacheService.getScriptCache().put('v2_depts', JSON.stringify(records), 600);
+    } catch (_ignored) {}
+  }
+
   if (options && typeof options.predicate === 'function') records = records.filter(options.predicate);
   if (options && Object.prototype.hasOwnProperty.call(options, 'limit')) {
     records = records.slice(0, Math.max(0, Number(options.limit) || 0));
@@ -5620,6 +5667,9 @@ function readV2Records_(sheetName, options) {
 function appendV2Records_(sheetName, records) {
   const rows = Array.isArray(records) ? records : [];
   if (!rows.length) return { startRow: null, rowCount: 0 };
+  if (sheetName === 'M_Departments') {
+    try { CacheService.getScriptCache().remove('v2_depts'); } catch (_ignored) {}
+  }
   const sheet = getV2SheetOrThrow_(sheetName);
   const headers = getV2HeaderMap_(sheet);
   const headerNames = Object.keys(headers).sort(function (a, b) { return headers[a] - headers[b]; });
@@ -5634,6 +5684,9 @@ function appendV2Records_(sheetName, records) {
 }
 
 function updateV2RecordByKey_(sheetName, keyName, keyValue, updates) {
+  if (sheetName === 'M_Departments') {
+    try { CacheService.getScriptCache().remove('v2_depts'); } catch (_ignored) {}
+  }
   const sheet = getV2SheetOrThrow_(sheetName);
   const headers = getV2HeaderMap_(sheet);
   const keyColumn = headers[keyName];
@@ -5661,11 +5714,21 @@ function readV2RecordAtRow_(sheet, rowNumber, headers) {
 }
 
 function getV2Config_(key, fallbackValue) {
+  try {
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get('v2_cfg_' + key);
+    if (cached !== null) return cached;
+  } catch (_ignored) {}
+
   const rows = readV2Records_('M_SystemConfig', {
     predicate: function (row) { return String(row.ConfigKey || '') === String(key); },
     limit: 1,
   });
-  return rows.length ? rows[0].ConfigValue : fallbackValue;
+  const val = rows.length ? rows[0].ConfigValue : fallbackValue;
+  try {
+    CacheService.getScriptCache().put('v2_cfg_' + key, String(val != null ? val : ''), 600);
+  } catch (_ignored) {}
+  return val;
 }
 
 function safeV2SheetValue_(value) {
@@ -5713,21 +5776,58 @@ function requireV2Session_(token, options) {
   if (!rawToken) throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
 
   const tokenHash = sha256V2Hex_(rawToken);
+  const cacheKey = 'v2_sess_' + tokenHash;
+  const now = new Date();
+
+  try {
+    const cachedRaw = CacheService.getScriptCache().get(cacheKey);
+    if (cachedRaw) {
+      const cached = JSON.parse(cachedRaw);
+      const expiresAt = new Date(cached.expiresAt);
+      const lastActivity = new Date(cached.lastActivityAt || 0);
+      const timeoutMinutes = Number(cached.timeoutMinutes) || 45;
+
+      if (isFinite(expiresAt.getTime()) && expiresAt > now && now.getTime() - lastActivity.getTime() <= timeoutMinutes * 60 * 1000) {
+        const touch = !options || options.touch !== false;
+        let clientExpiresAt = expiresAt;
+        if (touch && now.getTime() - lastActivity.getTime() >= 2 * 60 * 1000) {
+          clientExpiresAt = new Date(now.getTime() + timeoutMinutes * 60 * 1000);
+          cached.lastActivityAt = now.toISOString();
+          cached.expiresAt = clientExpiresAt.toISOString();
+          try {
+            CacheService.getScriptCache().put(cacheKey, JSON.stringify(cached), 300);
+            updateV2RecordByKey_('S_Sessions', 'SessionID', cached.sessionId, {
+              LastActivityAt: now.toISOString(),
+              ExpiresAt: clientExpiresAt.toISOString(),
+            });
+          } catch (_ignored) {}
+        }
+        return {
+          sessionId: String(cached.sessionId || ''),
+          tokenHash: tokenHash,
+          user: cached.user,
+          expiresAt: clientExpiresAt.toISOString(),
+        };
+      }
+    }
+  } catch (_cacheErr) {}
+
   const sessions = readV2Records_('S_Sessions', {
     predicate: function (row) { return String(row.TokenHash || '') === tokenHash; },
     limit: 1,
   });
   const session = sessions.length ? sessions[0] : null;
-  const now = new Date();
   const expiresAt = session ? new Date(session.ExpiresAt) : new Date(0);
   const revoked = session && String(session.Revoked || '').toUpperCase() === 'TRUE';
 
   if (!session || revoked || !isFinite(expiresAt.getTime()) || expiresAt <= now) {
+    try { CacheService.getScriptCache().remove(cacheKey); } catch (_e) {}
     throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
   }
 
   const user = findV2UserById_(session.UserID);
   if (!user || String(user.AccountStatus || '').toUpperCase() !== 'ACTIVE') {
+    try { CacheService.getScriptCache().remove(cacheKey); } catch (_e) {}
     throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
   }
 
@@ -5739,6 +5839,7 @@ function requireV2Session_(token, options) {
       RevokedAt: now.toISOString(),
       RevokeReason: 'IDLE_TIMEOUT',
     });
+    try { CacheService.getScriptCache().remove(cacheKey); } catch (_e) {}
     throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
   }
 
@@ -5753,12 +5854,26 @@ function requireV2Session_(token, options) {
     clientExpiresAt = nextExpiresAt;
   }
 
-  return {
+  const identity = trustedV2Identity_(user);
+  const sessionResult = {
     sessionId: String(session.SessionID || ''),
     tokenHash: tokenHash,
-    user: trustedV2Identity_(user),
+    user: identity,
     expiresAt: clientExpiresAt.toISOString(),
   };
+
+  try {
+    CacheService.getScriptCache().put(cacheKey, JSON.stringify({
+      sessionId: sessionResult.sessionId,
+      tokenHash: tokenHash,
+      user: identity,
+      expiresAt: sessionResult.expiresAt,
+      lastActivityAt: now.toISOString(),
+      timeoutMinutes: timeoutMinutes,
+    }), 300);
+  } catch (_ignored) {}
+
+  return sessionResult;
 }
 
 function logoutV2_(context) {
@@ -5768,6 +5883,9 @@ function logoutV2_(context) {
       RevokedAt: new Date().toISOString(),
       RevokeReason: 'USER_LOGOUT',
     });
+  }
+  if (context && context.tokenHash) {
+    try { CacheService.getScriptCache().remove('v2_sess_' + context.tokenHash); } catch (_e) {}
   }
   return { loggedOut: true, apiVersion: 'v2' };
 }
@@ -6276,6 +6394,11 @@ function v2BootstrapBase64WebSafeNoPadding_(bytes) {
 
 function listUsersV2_(context) {
   assertAdminRoleV2_(context);
+  try {
+    const cached = CacheService.getScriptCache().get('v2_users_list');
+    if (cached) return JSON.parse(cached);
+  } catch (_ignored) {}
+
   const rawUsers = readV2Records_('T_Users');
   const departments = readV2Records_('M_Departments');
   const deptMap = {};
@@ -6305,7 +6428,11 @@ function listUsersV2_(context) {
     };
   });
 
-  return { users: users };
+  const result = { users: users };
+  try {
+    CacheService.getScriptCache().put('v2_users_list', JSON.stringify(result), 60);
+  } catch (_ignored) {}
+  return result;
 }
 
 function createUserByAdminV2_(context, payload, requestId) {
@@ -6391,6 +6518,8 @@ function createUserByAdminV2_(context, payload, requestId) {
       RequestID: String(requestId || ''),
     });
 
+    try { CacheService.getScriptCache().remove('v2_users_list'); } catch (_ignored) {}
+
     return {
       success: true,
       staffId: staffId,
@@ -6440,6 +6569,7 @@ function resetUserPinByAdminV2_(context, payload, requestId) {
       RequestID: String(requestId || ''),
     });
 
+    try { CacheService.getScriptCache().remove('v2_users_list'); } catch (_ignored) {}
     return { success: true, staffId: staffId };
   } finally {
     lock.releaseLock();
@@ -6511,6 +6641,7 @@ function updateUserByAdminV2_(context, payload, requestId) {
       RequestID: String(requestId || ''),
     });
 
+    try { CacheService.getScriptCache().remove('v2_users_list'); } catch (_ignored) {}
     return { success: true, staffId: staffId };
   } finally {
     lock.releaseLock();

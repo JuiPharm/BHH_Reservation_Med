@@ -51,11 +51,21 @@ function getV2Dashboard_(context, payload) {
   const total = reservations.length;
   const start = (requestedPage - 1) * pageSize;
   const pageRows = reservations.slice(start, start + pageSize);
-  const itemCounts = readV2Records_('T_ReservationItems').reduce(function (counts, item) {
-    const id = String(item.ReservationID || '');
-    if (id) counts[id] = (counts[id] || 0) + 1;
-    return counts;
-  }, {});
+  const itemCounts = {};
+  if (pageRows.length > 0) {
+    const itemsSheet = getV2SheetOrThrow_('T_ReservationItems');
+    if (itemsSheet.getLastRow() >= 2) {
+      const pageIds = {};
+      pageRows.forEach(function (r) { pageIds[String(r.ReservationID || '')] = true; });
+      const items = readV2Records_('T_ReservationItems', {
+        predicate: function (item) { return Boolean(pageIds[String(item.ReservationID || '')]); },
+      });
+      items.forEach(function (item) {
+        const id = String(item.ReservationID || '');
+        if (id) itemCounts[id] = (itemCounts[id] || 0) + 1;
+      });
+    }
+  }
 
   const recentOrders = reportOnly ? [] : pageRows.map(function (row) {
     const id = String(row.ReservationID || '');
