@@ -26,14 +26,15 @@ const API_ACTIONS_ = Object.freeze({
   GET_RESCHEDULE_ORDER: Object.freeze({ auth: true, mutates: false, handler: 'getRescheduleOrder_' }),
   SUBMIT_APPOINTMENT_RESCHEDULE: Object.freeze({ auth: true, mutates: true, handler: 'submitAppointmentReschedule_' }),
   GET_DATABASE_HEALTH: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: false, handler: 'getDatabaseHealth' }),
-  LIST_USERS: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: false, handler: 'listUsers_' }),
-  CREATE_USER: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'createUserByAdmin_' }),
-  RESET_USER_PIN: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'resetUserPinByAdmin_' }),
-  UPDATE_USER: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN']), mutates: true, handler: 'updateUserByAdmin_' }),
+  LIST_USERS: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN', 'SYSTEM_ADMIN', 'PHARMACY_MANAGER']), mutates: false, handler: 'listUsers_', v2: true }),
+  CREATE_USER: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN', 'SYSTEM_ADMIN', 'PHARMACY_MANAGER']), mutates: true, handler: 'createUserByAdmin_', v2: true }),
+  RESET_USER_PIN: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN', 'SYSTEM_ADMIN', 'PHARMACY_MANAGER']), mutates: true, handler: 'resetUserPinByAdmin_', v2: true }),
+  UPDATE_USER: Object.freeze({ auth: true, roles: Object.freeze(['ADMIN', 'SYSTEM_ADMIN', 'PHARMACY_MANAGER']), mutates: true, handler: 'updateUserByAdmin_', v2: true }),
 });
 
 const GET_ACTIONS_ = Object.freeze({
   HEALTH_V2: Object.freeze({ auth: false, mutates: false, handler: 'healthV2_', v2: true }),
+  DIAGNOSE_V2: Object.freeze({ auth: false, mutates: false, handler: 'diagnoseV2_', v2: true }),
   GET_APPOINTMENT_ACTION: Object.freeze({ auth: false, mutates: false, handler: 'getAppointmentAction_' }),
   GET_RESCHEDULE_REFERENCE: Object.freeze({ auth: false, mutates: false, handler: 'getRescheduleReference_' }),
 });
@@ -47,6 +48,7 @@ function routeApiRequest_(request, responseMetadata) {
     let v2Context = null;
     if (action.auth) {
       v2Context = requireV2Session_(request.sessionToken, { touch: true });
+      if (action.roles) requireRole_(v2Context, action.roles);
       if (responseMetadata && typeof responseMetadata === 'object') {
         responseMetadata.sessionExpiresAt = String(v2Context.expiresAt || '');
       }
@@ -133,8 +135,13 @@ function resolveApiHandler_(name) {
 
 function invokeV2ApiAction_(actionName, context, request) {
   if (actionName === 'HEALTH_V2') return healthV2_();
+  if (actionName === 'DIAGNOSE_V2') return diagnoseV2_();
   if (actionName === 'LOGIN_V2') return loginV2_(request.payload, request.requestId);
   if (actionName === 'LOGOUT_V2') return logoutV2_(context);
   if (actionName === 'GET_V2_DASHBOARD') return getV2Dashboard_(context, request.payload);
+  if (actionName === 'LIST_USERS') return listUsersV2_(context);
+  if (actionName === 'CREATE_USER') return createUserByAdminV2_(context, request.payload, request.requestId);
+  if (actionName === 'RESET_USER_PIN') return resetUserPinByAdminV2_(context, request.payload, request.requestId);
+  if (actionName === 'UPDATE_USER') return updateUserByAdminV2_(context, request.payload, request.requestId);
   throw new ApiError_('UNKNOWN_ACTION', 'Unsupported action.');
 }
