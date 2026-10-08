@@ -227,11 +227,16 @@ function getStaffDashboard_(context, query) {
   const dashboardQuery = normalizeStaffDashboardQuery_(query);
   const filterDept = isAdmin ? dashboardQuery.department : userDept;
 
-  const cache = CacheService.getScriptCache();
-  const cacheVersion = cache.get('DASHBOARD_VERSION') || '0';
-  const cacheKey = 'STAFF_' + cacheVersion + '_' + Utilities.base64Encode(JSON.stringify({ d: filterDept, s: dashboardQuery.status, q: dashboardQuery.search, f: dashboardQuery.sortField, r: dashboardQuery.sortDirection, p: dashboardQuery.page, z: dashboardQuery.pageSize })).substring(0, 200);
+  let cache = null;
+  try {
+    if (typeof CacheService !== 'undefined' && CacheService && typeof CacheService.getScriptCache === 'function') {
+      cache = CacheService.getScriptCache();
+    }
+  } catch (_e) {}
+  const cacheVersion = cache ? (cache.get('DASHBOARD_VERSION') || '0') : '0';
+  const cacheKey = 'STAFF_' + cacheVersion + '_' + encodeURIComponent(JSON.stringify({ d: filterDept, s: dashboardQuery.status, q: dashboardQuery.search, f: dashboardQuery.sortField, r: dashboardQuery.sortDirection, p: dashboardQuery.page, z: dashboardQuery.pageSize })).substring(0, 200);
   
-  const cached = cache.get(cacheKey);
+  const cached = cache ? cache.get(cacheKey) : null;
   if (cached) {
     try { return JSON.parse(cached); } catch(e) {}
   }
@@ -263,10 +268,12 @@ function getStaffDashboard_(context, query) {
 
   const result = { department: filterDept || (isAdmin ? 'ALL' : userDept), totalOrders: allFilteredOrders.length, statusCounts: counts, page: page, pageSize: pageSize, total: allFilteredOrders.length, recentOrders: pagedOrders };
   
-  try {
-    const jsonResult = JSON.stringify(result);
-    if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
-  } catch(e) {}
+  if (cache) {
+    try {
+      const jsonResult = JSON.stringify(result);
+      if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
+    } catch(e) {}
+  }
   
   return result;
 }
@@ -299,11 +306,16 @@ function getAdminDashboard_(context, query) {
   const pageSize = Math.min(MAX_ORDER_PAGE_SIZE_, positiveInteger_(filters.pageSize == null ? filters.limit : filters.pageSize, 25));
   const page = positiveInteger_(filters.page, 1);
 
-  const cache = CacheService.getScriptCache();
-  const cacheVersion = cache.get('DASHBOARD_VERSION') || '0';
-  const cacheKey = 'ADMIN_' + cacheVersion + '_' + Utilities.base64Encode(JSON.stringify({ d: department, s: statusFilter, q: search, p: page, z: pageSize })).substring(0, 200);
+  let cache = null;
+  try {
+    if (typeof CacheService !== 'undefined' && CacheService && typeof CacheService.getScriptCache === 'function') {
+      cache = CacheService.getScriptCache();
+    }
+  } catch (_e) {}
+  const cacheVersion = cache ? (cache.get('DASHBOARD_VERSION') || '0') : '0';
+  const cacheKey = 'ADMIN_' + cacheVersion + '_' + encodeURIComponent(JSON.stringify({ d: department, s: statusFilter, q: search, p: page, z: pageSize })).substring(0, 200);
   
-  const cached = cache.get(cacheKey);
+  const cached = cache ? cache.get(cacheKey) : null;
   if (cached) {
     try { return JSON.parse(cached); } catch(e) {}
   }
@@ -335,10 +347,12 @@ function getAdminDashboard_(context, query) {
 
   const result = { department: department || 'ALL', totalOrders: allFilteredOrders.length, statusCounts: statusCounts, page: page, pageSize: pageSize, total: allFilteredOrders.length, recentOrders: pagedOrders };
   
-  try {
-    const jsonResult = JSON.stringify(result);
-    if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
-  } catch(e) {}
+  if (cache) {
+    try {
+      const jsonResult = JSON.stringify(result);
+      if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
+    } catch(e) {}
+  }
   
   return result;
 }

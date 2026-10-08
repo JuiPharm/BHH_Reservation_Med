@@ -7,7 +7,8 @@
 function listUsersV2_(context) {
   assertAdminRoleV2_(context);
   try {
-    const cached = CacheService.getScriptCache().get('v2_users_list');
+    const cache = getV2Cache_();
+    const cached = cache ? cache.get('v2_users_list') : null;
     if (cached) return JSON.parse(cached);
   } catch (_ignored) {}
 
@@ -42,7 +43,8 @@ function listUsersV2_(context) {
 
   const result = { users: users };
   try {
-    CacheService.getScriptCache().put('v2_users_list', JSON.stringify(result), 60);
+    const cache = getV2Cache_();
+    if (cache) cache.put('v2_users_list', JSON.stringify(result), 60);
   } catch (_ignored) {}
   return result;
 }
@@ -130,7 +132,7 @@ function createUserByAdminV2_(context, payload, requestId) {
       RequestID: String(requestId || ''),
     });
 
-    try { CacheService.getScriptCache().remove('v2_users_list'); } catch (_ignored) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove('v2_users_list'); } catch (_ignored) {}
 
     return {
       success: true,
@@ -181,7 +183,7 @@ function resetUserPinByAdminV2_(context, payload, requestId) {
       RequestID: String(requestId || ''),
     });
 
-    try { CacheService.getScriptCache().remove('v2_users_list'); } catch (_ignored) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove('v2_users_list'); } catch (_ignored) {}
     return { success: true, staffId: staffId };
   } finally {
     lock.releaseLock();
@@ -253,7 +255,7 @@ function updateUserByAdminV2_(context, payload, requestId) {
       RequestID: String(requestId || ''),
     });
 
-    try { CacheService.getScriptCache().remove('v2_users_list'); } catch (_ignored) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove('v2_users_list'); } catch (_ignored) {}
     return { success: true, staffId: staffId };
   } finally {
     lock.releaseLock();

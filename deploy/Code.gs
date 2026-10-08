@@ -328,11 +328,32 @@ function routeApiRequest_(request, responseMetadata) {
 
   let context = null;
   if (action.auth) {
-    context = requireSession_(request.sessionToken, { touch: true });
+    context = authenticateAnySession_(request.sessionToken, { touch: true });
     if (action.roles) requireRole_(context, action.roles);
     if (responseMetadata && typeof responseMetadata === 'object') responseMetadata.sessionExpiresAt = String(context.expiresAt || '');
   }
   return invokeApiAction_(request.action, action, context, request);
+}
+
+function authenticateAnySession_(token, options) {
+  const rawToken = typeof token === 'string' ? token.trim() : '';
+  if (!rawToken) throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
+
+  // Try V2 session first
+  try {
+    const v2Context = requireV2Session_(rawToken, options);
+    if (v2Context && v2Context.user) {
+      const u = v2Context.user;
+      if (!u.FullName && u.StaffName) u.FullName = u.StaffName;
+      if (!u.Department && u.DepartmentName) u.Department = u.DepartmentName;
+      return v2Context;
+    }
+  } catch (_v2Err) {
+    // If V2 validation fails, proceed to try V1 session below
+  }
+
+  // Fallback to V1 session
+  return requireSession_(rawToken, options);
 }
 
 function invokeApiAction_(actionName, action, context, request) {
@@ -990,15 +1011,25 @@ function writeAudit_(entry) {
 function requireRole_(context, roles) {
   const allowed = Array.isArray(roles) ? roles : [roles];
   const role = context && context.user ? String(context.user.Role || '').toUpperCase() : '';
-  if (allowed.map(function (value) { return String(value).toUpperCase(); }).indexOf(role) < 0) throw new ApiError_('ACCESS_DENIED', 'Access denied.');
+  const isV2Admin = role === 'SYSTEM_ADMIN' || role === 'PHARMACY_MANAGER';
+  const effectiveRoles = [role];
+  if (isV2Admin) effectiveRoles.push('ADMIN');
+  if (role === 'PHARMACY_OPERATOR') effectiveRoles.push('ADMIN', 'STAFF');
+  if (role === 'WARD_STAFF') effectiveRoles.push('STAFF', 'REQUESTER');
+
+  const allowedUpper = allowed.map(function (value) { return String(value).toUpperCase(); });
+  const hasAccess = effectiveRoles.some(function (r) { return allowedUpper.indexOf(r) >= 0; });
+  if (!hasAccess) throw new ApiError_('ACCESS_DENIED', 'Access denied.');
   return context;
 }
 
 function requireOrderAccess_(context, order) {
   const user = context && context.user;
   const role = user ? String(user.Role || '').toUpperCase() : '';
+  const isStaffOrAdmin = role === 'ADMIN' || role === 'SYSTEM_ADMIN' || role === 'PHARMACY_MANAGER' || role === 'PHARMACY_OPERATOR';
   const requestedDepartment = order ? String(order.Department || '') : '';
-  if (!user || !order || (role !== 'ADMIN' && String(user.Department || '') !== requestedDepartment)) throw new ApiError_('ACCESS_DENIED', 'Access denied.');
+  if (!user || !order) throw new ApiError_('ACCESS_DENIED', 'Access denied.');
+  if (!isStaffOrAdmin && String(user.Department || '') !== requestedDepartment) throw new ApiError_('ACCESS_DENIED', 'Access denied.');
   return order;
 }
 
@@ -1862,15 +1893,41 @@ function getMasterData_(types) {
 }
 
 function loadActiveMasterData_() {
-  return readRecords_('MasterData').reduce(function (result, record) {
+  let records = [];
+  try {
+    records = readRecords_('MasterData');
+  } catch (_e) {
+    records = [];
+  }
+  const result = (records || []).reduce(function (res, record) {
     const type = String(record.Type || '').trim();
     const code = String(record.Code || '').trim();
     const active = String(record.Active).toUpperCase() !== 'FALSE';
-    if (!type || !code || !active) return result;
-    if (!result[type]) result[type] = [];
-    result[type].push({ Code: code, DisplayName: String(record.DisplayName || code), SortOrder: record.SortOrder, Active: true });
-    return result;
+    if (!type || !code || !active) return res;
+    if (!res[type]) res[type] = [];
+    res[type].push({ Code: code, DisplayName: String(record.DisplayName || code), SortOrder: record.SortOrder, Active: true });
+    return res;
   }, {});
+
+  const defaultPriorities = [
+    { Code: 'NORMAL', DisplayName: 'ปกติ (Normal)', SortOrder: 1, Active: true },
+    { Code: 'URGENT', DisplayName: 'ด่วน (Urgent)', SortOrder: 2, Active: true },
+    { Code: 'CRITICAL', DisplayName: 'ด่วนที่สุด (Critical)', SortOrder: 3, Active: true },
+  ];
+  if (!result.PRIORITY || result.PRIORITY.length === 0) {
+    result.PRIORITY = defaultPriorities;
+  }
+  if (!result.DOSAGE_FORM || result.DOSAGE_FORM.length === 0) {
+    result.DOSAGE_FORM = (SCHEMA_DEFINITIONS_.DOSAGE_FORM || []).map(function (c, idx) {
+      return { Code: c, DisplayName: c, SortOrder: idx + 1, Active: true };
+    });
+  }
+  if (!result.UNIT || result.UNIT.length === 0) {
+    result.UNIT = (SCHEMA_DEFINITIONS_.UNIT || []).map(function (c, idx) {
+      return { Code: c, DisplayName: c, SortOrder: idx + 1, Active: true };
+    });
+  }
+  return result;
 }
 
 /**
@@ -2167,11 +2224,16 @@ function getStaffDashboard_(context, query) {
   const dashboardQuery = normalizeStaffDashboardQuery_(query);
   const filterDept = isAdmin ? dashboardQuery.department : userDept;
 
-  const cache = CacheService.getScriptCache();
-  const cacheVersion = cache.get('DASHBOARD_VERSION') || '0';
-  const cacheKey = 'STAFF_' + cacheVersion + '_' + Utilities.base64Encode(JSON.stringify({ d: filterDept, s: dashboardQuery.status, q: dashboardQuery.search, f: dashboardQuery.sortField, r: dashboardQuery.sortDirection, p: dashboardQuery.page, z: dashboardQuery.pageSize })).substring(0, 200);
+  let cache = null;
+  try {
+    if (typeof CacheService !== 'undefined' && CacheService && typeof CacheService.getScriptCache === 'function') {
+      cache = CacheService.getScriptCache();
+    }
+  } catch (_e) {}
+  const cacheVersion = cache ? (cache.get('DASHBOARD_VERSION') || '0') : '0';
+  const cacheKey = 'STAFF_' + cacheVersion + '_' + encodeURIComponent(JSON.stringify({ d: filterDept, s: dashboardQuery.status, q: dashboardQuery.search, f: dashboardQuery.sortField, r: dashboardQuery.sortDirection, p: dashboardQuery.page, z: dashboardQuery.pageSize })).substring(0, 200);
   
-  const cached = cache.get(cacheKey);
+  const cached = cache ? cache.get(cacheKey) : null;
   if (cached) {
     try { return JSON.parse(cached); } catch(e) {}
   }
@@ -2203,10 +2265,12 @@ function getStaffDashboard_(context, query) {
 
   const result = { department: filterDept || (isAdmin ? 'ALL' : userDept), totalOrders: allFilteredOrders.length, statusCounts: counts, page: page, pageSize: pageSize, total: allFilteredOrders.length, recentOrders: pagedOrders };
   
-  try {
-    const jsonResult = JSON.stringify(result);
-    if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
-  } catch(e) {}
+  if (cache) {
+    try {
+      const jsonResult = JSON.stringify(result);
+      if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
+    } catch(e) {}
+  }
   
   return result;
 }
@@ -2239,11 +2303,16 @@ function getAdminDashboard_(context, query) {
   const pageSize = Math.min(MAX_ORDER_PAGE_SIZE_, positiveInteger_(filters.pageSize == null ? filters.limit : filters.pageSize, 25));
   const page = positiveInteger_(filters.page, 1);
 
-  const cache = CacheService.getScriptCache();
-  const cacheVersion = cache.get('DASHBOARD_VERSION') || '0';
-  const cacheKey = 'ADMIN_' + cacheVersion + '_' + Utilities.base64Encode(JSON.stringify({ d: department, s: statusFilter, q: search, p: page, z: pageSize })).substring(0, 200);
+  let cache = null;
+  try {
+    if (typeof CacheService !== 'undefined' && CacheService && typeof CacheService.getScriptCache === 'function') {
+      cache = CacheService.getScriptCache();
+    }
+  } catch (_e) {}
+  const cacheVersion = cache ? (cache.get('DASHBOARD_VERSION') || '0') : '0';
+  const cacheKey = 'ADMIN_' + cacheVersion + '_' + encodeURIComponent(JSON.stringify({ d: department, s: statusFilter, q: search, p: page, z: pageSize })).substring(0, 200);
   
-  const cached = cache.get(cacheKey);
+  const cached = cache ? cache.get(cacheKey) : null;
   if (cached) {
     try { return JSON.parse(cached); } catch(e) {}
   }
@@ -2275,10 +2344,12 @@ function getAdminDashboard_(context, query) {
 
   const result = { department: department || 'ALL', totalOrders: allFilteredOrders.length, statusCounts: statusCounts, page: page, pageSize: pageSize, total: allFilteredOrders.length, recentOrders: pagedOrders };
   
-  try {
-    const jsonResult = JSON.stringify(result);
-    if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
-  } catch(e) {}
+  if (cache) {
+    try {
+      const jsonResult = JSON.stringify(result);
+      if (jsonResult.length < 100000) cache.put(cacheKey, jsonResult, 60);
+    } catch(e) {}
+  }
   
   return result;
 }
@@ -5410,7 +5481,21 @@ function getV2Dashboard_(context, payload) {
   const requestedPage = Math.max(1, Number(payload.page) || 1);
   const pageSize = Math.max(1, Math.min(100, Number(payload.pageSize) || 25));
 
-  let reservations = readV2Records_('T_Reservations');
+  let reservations = [];
+  try {
+    reservations = readV2Records_('T_Reservations');
+  } catch (_e) {
+    reservations = [];
+  }
+
+  if (reservations.length === 0) {
+    try {
+      const fallback = getStaffDashboard_(context, payload);
+      fallback.apiVersion = 'v2';
+      return fallback;
+    } catch (_e2) {}
+  }
+
   if (!canViewAll && role !== 'REPORT_VIEWER') {
     reservations = reservations.filter(function (row) {
       return String(row.DepartmentID || '') === departmentId;
@@ -5469,7 +5554,7 @@ function getV2Dashboard_(context, payload) {
       DepartmentID: String(row.DepartmentID || ''),
       Status: String(row.OverallStatus || ''),
       RequiredDate: String(row.RequiredDate || ''),
-      Priority: '',
+      Priority: String(row.Priority || ''),
       ItemCount: Number(itemCounts[id] || 0),
       CreatedAt: String(row.CreatedAt || ''),
       Version: Number(row.Version || 0),
@@ -5621,11 +5706,20 @@ function getV2HeaderMap_(sheet) {
   return map;
 }
 
+function getV2Cache_() {
+  try {
+    if (typeof CacheService !== 'undefined' && CacheService && typeof CacheService.getScriptCache === 'function') {
+      return CacheService.getScriptCache();
+    }
+  } catch (_ignored) {}
+  return null;
+}
+
 function readV2Records_(sheetName, options) {
   if (sheetName === 'M_Departments') {
     try {
-      const cache = CacheService.getScriptCache();
-      const cached = cache.get('v2_depts');
+      const cache = getV2Cache_();
+      const cached = cache ? cache.get('v2_depts') : null;
       if (cached) {
         let depts = JSON.parse(cached);
         if (options && typeof options.predicate === 'function') depts = depts.filter(options.predicate);
@@ -5653,7 +5747,8 @@ function readV2Records_(sheetName, options) {
 
   if (sheetName === 'M_Departments') {
     try {
-      CacheService.getScriptCache().put('v2_depts', JSON.stringify(records), 600);
+      const cache = getV2Cache_();
+      if (cache) cache.put('v2_depts', JSON.stringify(records), 600);
     } catch (_ignored) {}
   }
 
@@ -5668,7 +5763,10 @@ function appendV2Records_(sheetName, records) {
   const rows = Array.isArray(records) ? records : [];
   if (!rows.length) return { startRow: null, rowCount: 0 };
   if (sheetName === 'M_Departments') {
-    try { CacheService.getScriptCache().remove('v2_depts'); } catch (_ignored) {}
+    try {
+      const cache = getV2Cache_();
+      if (cache) cache.remove('v2_depts');
+    } catch (_ignored) {}
   }
   const sheet = getV2SheetOrThrow_(sheetName);
   const headers = getV2HeaderMap_(sheet);
@@ -5685,7 +5783,10 @@ function appendV2Records_(sheetName, records) {
 
 function updateV2RecordByKey_(sheetName, keyName, keyValue, updates) {
   if (sheetName === 'M_Departments') {
-    try { CacheService.getScriptCache().remove('v2_depts'); } catch (_ignored) {}
+    try {
+      const cache = getV2Cache_();
+      if (cache) cache.remove('v2_depts');
+    } catch (_ignored) {}
   }
   const sheet = getV2SheetOrThrow_(sheetName);
   const headers = getV2HeaderMap_(sheet);
@@ -5715,9 +5816,9 @@ function readV2RecordAtRow_(sheet, rowNumber, headers) {
 
 function getV2Config_(key, fallbackValue) {
   try {
-    const cache = CacheService.getScriptCache();
-    const cached = cache.get('v2_cfg_' + key);
-    if (cached !== null) return cached;
+    const cache = getV2Cache_();
+    const cached = cache ? cache.get('v2_cfg_' + key) : null;
+    if (cached !== null && cached !== undefined) return cached;
   } catch (_ignored) {}
 
   const rows = readV2Records_('M_SystemConfig', {
@@ -5726,7 +5827,8 @@ function getV2Config_(key, fallbackValue) {
   });
   const val = rows.length ? rows[0].ConfigValue : fallbackValue;
   try {
-    CacheService.getScriptCache().put('v2_cfg_' + key, String(val != null ? val : ''), 600);
+    const cache = getV2Cache_();
+    if (cache) cache.put('v2_cfg_' + key, String(val != null ? val : ''), 600);
   } catch (_ignored) {}
   return val;
 }
@@ -5780,7 +5882,8 @@ function requireV2Session_(token, options) {
   const now = new Date();
 
   try {
-    const cachedRaw = CacheService.getScriptCache().get(cacheKey);
+    const cache = getV2Cache_();
+    const cachedRaw = cache ? cache.get(cacheKey) : null;
     if (cachedRaw) {
       const cached = JSON.parse(cachedRaw);
       const expiresAt = new Date(cached.expiresAt);
@@ -5795,7 +5898,7 @@ function requireV2Session_(token, options) {
           cached.lastActivityAt = now.toISOString();
           cached.expiresAt = clientExpiresAt.toISOString();
           try {
-            CacheService.getScriptCache().put(cacheKey, JSON.stringify(cached), 300);
+            if (cache) cache.put(cacheKey, JSON.stringify(cached), 300);
             updateV2RecordByKey_('S_Sessions', 'SessionID', cached.sessionId, {
               LastActivityAt: now.toISOString(),
               ExpiresAt: clientExpiresAt.toISOString(),
@@ -5821,13 +5924,13 @@ function requireV2Session_(token, options) {
   const revoked = session && String(session.Revoked || '').toUpperCase() === 'TRUE';
 
   if (!session || revoked || !isFinite(expiresAt.getTime()) || expiresAt <= now) {
-    try { CacheService.getScriptCache().remove(cacheKey); } catch (_e) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove(cacheKey); } catch (_e) {}
     throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
   }
 
   const user = findV2UserById_(session.UserID);
   if (!user || String(user.AccountStatus || '').toUpperCase() !== 'ACTIVE') {
-    try { CacheService.getScriptCache().remove(cacheKey); } catch (_e) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove(cacheKey); } catch (_e) {}
     throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
   }
 
@@ -5839,7 +5942,7 @@ function requireV2Session_(token, options) {
       RevokedAt: now.toISOString(),
       RevokeReason: 'IDLE_TIMEOUT',
     });
-    try { CacheService.getScriptCache().remove(cacheKey); } catch (_e) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove(cacheKey); } catch (_e) {}
     throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
   }
 
@@ -5863,14 +5966,17 @@ function requireV2Session_(token, options) {
   };
 
   try {
-    CacheService.getScriptCache().put(cacheKey, JSON.stringify({
-      sessionId: sessionResult.sessionId,
-      tokenHash: tokenHash,
-      user: identity,
-      expiresAt: sessionResult.expiresAt,
-      lastActivityAt: now.toISOString(),
-      timeoutMinutes: timeoutMinutes,
-    }), 300);
+    const cache = getV2Cache_();
+    if (cache) {
+      cache.put(cacheKey, JSON.stringify({
+        sessionId: sessionResult.sessionId,
+        tokenHash: tokenHash,
+        user: identity,
+        expiresAt: sessionResult.expiresAt,
+        lastActivityAt: now.toISOString(),
+        timeoutMinutes: timeoutMinutes,
+      }), 300);
+    }
   } catch (_ignored) {}
 
   return sessionResult;
@@ -5885,7 +5991,7 @@ function logoutV2_(context) {
     });
   }
   if (context && context.tokenHash) {
-    try { CacheService.getScriptCache().remove('v2_sess_' + context.tokenHash); } catch (_e) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove('v2_sess_' + context.tokenHash); } catch (_e) {}
   }
   return { loggedOut: true, apiVersion: 'v2' };
 }
@@ -6395,7 +6501,8 @@ function v2BootstrapBase64WebSafeNoPadding_(bytes) {
 function listUsersV2_(context) {
   assertAdminRoleV2_(context);
   try {
-    const cached = CacheService.getScriptCache().get('v2_users_list');
+    const cache = getV2Cache_();
+    const cached = cache ? cache.get('v2_users_list') : null;
     if (cached) return JSON.parse(cached);
   } catch (_ignored) {}
 
@@ -6430,7 +6537,8 @@ function listUsersV2_(context) {
 
   const result = { users: users };
   try {
-    CacheService.getScriptCache().put('v2_users_list', JSON.stringify(result), 60);
+    const cache = getV2Cache_();
+    if (cache) cache.put('v2_users_list', JSON.stringify(result), 60);
   } catch (_ignored) {}
   return result;
 }
@@ -6518,7 +6626,7 @@ function createUserByAdminV2_(context, payload, requestId) {
       RequestID: String(requestId || ''),
     });
 
-    try { CacheService.getScriptCache().remove('v2_users_list'); } catch (_ignored) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove('v2_users_list'); } catch (_ignored) {}
 
     return {
       success: true,
@@ -6569,7 +6677,7 @@ function resetUserPinByAdminV2_(context, payload, requestId) {
       RequestID: String(requestId || ''),
     });
 
-    try { CacheService.getScriptCache().remove('v2_users_list'); } catch (_ignored) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove('v2_users_list'); } catch (_ignored) {}
     return { success: true, staffId: staffId };
   } finally {
     lock.releaseLock();
@@ -6641,7 +6749,7 @@ function updateUserByAdminV2_(context, payload, requestId) {
       RequestID: String(requestId || ''),
     });
 
-    try { CacheService.getScriptCache().remove('v2_users_list'); } catch (_ignored) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove('v2_users_list'); } catch (_ignored) {}
     return { success: true, staffId: staffId };
   } finally {
     lock.releaseLock();

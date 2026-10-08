@@ -39,11 +39,20 @@ function getV2HeaderMap_(sheet) {
   return map;
 }
 
+function getV2Cache_() {
+  try {
+    if (typeof CacheService !== 'undefined' && CacheService && typeof CacheService.getScriptCache === 'function') {
+      return CacheService.getScriptCache();
+    }
+  } catch (_ignored) {}
+  return null;
+}
+
 function readV2Records_(sheetName, options) {
   if (sheetName === 'M_Departments') {
     try {
-      const cache = CacheService.getScriptCache();
-      const cached = cache.get('v2_depts');
+      const cache = getV2Cache_();
+      const cached = cache ? cache.get('v2_depts') : null;
       if (cached) {
         let depts = JSON.parse(cached);
         if (options && typeof options.predicate === 'function') depts = depts.filter(options.predicate);
@@ -71,7 +80,8 @@ function readV2Records_(sheetName, options) {
 
   if (sheetName === 'M_Departments') {
     try {
-      CacheService.getScriptCache().put('v2_depts', JSON.stringify(records), 600);
+      const cache = getV2Cache_();
+      if (cache) cache.put('v2_depts', JSON.stringify(records), 600);
     } catch (_ignored) {}
   }
 
@@ -86,7 +96,10 @@ function appendV2Records_(sheetName, records) {
   const rows = Array.isArray(records) ? records : [];
   if (!rows.length) return { startRow: null, rowCount: 0 };
   if (sheetName === 'M_Departments') {
-    try { CacheService.getScriptCache().remove('v2_depts'); } catch (_ignored) {}
+    try {
+      const cache = getV2Cache_();
+      if (cache) cache.remove('v2_depts');
+    } catch (_ignored) {}
   }
   const sheet = getV2SheetOrThrow_(sheetName);
   const headers = getV2HeaderMap_(sheet);
@@ -103,7 +116,10 @@ function appendV2Records_(sheetName, records) {
 
 function updateV2RecordByKey_(sheetName, keyName, keyValue, updates) {
   if (sheetName === 'M_Departments') {
-    try { CacheService.getScriptCache().remove('v2_depts'); } catch (_ignored) {}
+    try {
+      const cache = getV2Cache_();
+      if (cache) cache.remove('v2_depts');
+    } catch (_ignored) {}
   }
   const sheet = getV2SheetOrThrow_(sheetName);
   const headers = getV2HeaderMap_(sheet);
@@ -133,9 +149,9 @@ function readV2RecordAtRow_(sheet, rowNumber, headers) {
 
 function getV2Config_(key, fallbackValue) {
   try {
-    const cache = CacheService.getScriptCache();
-    const cached = cache.get('v2_cfg_' + key);
-    if (cached !== null) return cached;
+    const cache = getV2Cache_();
+    const cached = cache ? cache.get('v2_cfg_' + key) : null;
+    if (cached !== null && cached !== undefined) return cached;
   } catch (_ignored) {}
 
   const rows = readV2Records_('M_SystemConfig', {
@@ -144,7 +160,8 @@ function getV2Config_(key, fallbackValue) {
   });
   const val = rows.length ? rows[0].ConfigValue : fallbackValue;
   try {
-    CacheService.getScriptCache().put('v2_cfg_' + key, String(val != null ? val : ''), 600);
+    const cache = getV2Cache_();
+    if (cache) cache.put('v2_cfg_' + key, String(val != null ? val : ''), 600);
   } catch (_ignored) {}
   return val;
 }

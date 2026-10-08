@@ -58,11 +58,32 @@ function routeApiRequest_(request, responseMetadata) {
 
   let context = null;
   if (action.auth) {
-    context = requireSession_(request.sessionToken, { touch: true });
+    context = authenticateAnySession_(request.sessionToken, { touch: true });
     if (action.roles) requireRole_(context, action.roles);
     if (responseMetadata && typeof responseMetadata === 'object') responseMetadata.sessionExpiresAt = String(context.expiresAt || '');
   }
   return invokeApiAction_(request.action, action, context, request);
+}
+
+function authenticateAnySession_(token, options) {
+  const rawToken = typeof token === 'string' ? token.trim() : '';
+  if (!rawToken) throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
+
+  // Try V2 session first
+  try {
+    const v2Context = requireV2Session_(rawToken, options);
+    if (v2Context && v2Context.user) {
+      const u = v2Context.user;
+      if (!u.FullName && u.StaffName) u.FullName = u.StaffName;
+      if (!u.Department && u.DepartmentName) u.Department = u.DepartmentName;
+      return v2Context;
+    }
+  } catch (_v2Err) {
+    // If V2 validation fails, proceed to try V1 session below
+  }
+
+  // Fallback to V1 session
+  return requireSession_(rawToken, options);
 }
 
 function invokeApiAction_(actionName, action, context, request) {

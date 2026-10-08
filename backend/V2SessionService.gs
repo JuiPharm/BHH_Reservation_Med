@@ -38,7 +38,8 @@ function requireV2Session_(token, options) {
   const now = new Date();
 
   try {
-    const cachedRaw = CacheService.getScriptCache().get(cacheKey);
+    const cache = getV2Cache_();
+    const cachedRaw = cache ? cache.get(cacheKey) : null;
     if (cachedRaw) {
       const cached = JSON.parse(cachedRaw);
       const expiresAt = new Date(cached.expiresAt);
@@ -53,7 +54,7 @@ function requireV2Session_(token, options) {
           cached.lastActivityAt = now.toISOString();
           cached.expiresAt = clientExpiresAt.toISOString();
           try {
-            CacheService.getScriptCache().put(cacheKey, JSON.stringify(cached), 300);
+            if (cache) cache.put(cacheKey, JSON.stringify(cached), 300);
             updateV2RecordByKey_('S_Sessions', 'SessionID', cached.sessionId, {
               LastActivityAt: now.toISOString(),
               ExpiresAt: clientExpiresAt.toISOString(),
@@ -79,13 +80,13 @@ function requireV2Session_(token, options) {
   const revoked = session && String(session.Revoked || '').toUpperCase() === 'TRUE';
 
   if (!session || revoked || !isFinite(expiresAt.getTime()) || expiresAt <= now) {
-    try { CacheService.getScriptCache().remove(cacheKey); } catch (_e) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove(cacheKey); } catch (_e) {}
     throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
   }
 
   const user = findV2UserById_(session.UserID);
   if (!user || String(user.AccountStatus || '').toUpperCase() !== 'ACTIVE') {
-    try { CacheService.getScriptCache().remove(cacheKey); } catch (_e) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove(cacheKey); } catch (_e) {}
     throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
   }
 
@@ -97,7 +98,7 @@ function requireV2Session_(token, options) {
       RevokedAt: now.toISOString(),
       RevokeReason: 'IDLE_TIMEOUT',
     });
-    try { CacheService.getScriptCache().remove(cacheKey); } catch (_e) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove(cacheKey); } catch (_e) {}
     throw new ApiError_('SESSION_EXPIRED', 'Your session has expired.');
   }
 
@@ -121,14 +122,17 @@ function requireV2Session_(token, options) {
   };
 
   try {
-    CacheService.getScriptCache().put(cacheKey, JSON.stringify({
-      sessionId: sessionResult.sessionId,
-      tokenHash: tokenHash,
-      user: identity,
-      expiresAt: sessionResult.expiresAt,
-      lastActivityAt: now.toISOString(),
-      timeoutMinutes: timeoutMinutes,
-    }), 300);
+    const cache = getV2Cache_();
+    if (cache) {
+      cache.put(cacheKey, JSON.stringify({
+        sessionId: sessionResult.sessionId,
+        tokenHash: tokenHash,
+        user: identity,
+        expiresAt: sessionResult.expiresAt,
+        lastActivityAt: now.toISOString(),
+        timeoutMinutes: timeoutMinutes,
+      }), 300);
+    }
   } catch (_ignored) {}
 
   return sessionResult;
@@ -143,7 +147,7 @@ function logoutV2_(context) {
     });
   }
   if (context && context.tokenHash) {
-    try { CacheService.getScriptCache().remove('v2_sess_' + context.tokenHash); } catch (_e) {}
+    try { const cache = getV2Cache_(); if (cache) cache.remove('v2_sess_' + context.tokenHash); } catch (_e) {}
   }
   return { loggedOut: true, apiVersion: 'v2' };
 }

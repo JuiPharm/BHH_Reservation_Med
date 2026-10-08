@@ -18,7 +18,21 @@ function getV2Dashboard_(context, payload) {
   const requestedPage = Math.max(1, Number(payload.page) || 1);
   const pageSize = Math.max(1, Math.min(100, Number(payload.pageSize) || 25));
 
-  let reservations = readV2Records_('T_Reservations');
+  let reservations = [];
+  try {
+    reservations = readV2Records_('T_Reservations');
+  } catch (_e) {
+    reservations = [];
+  }
+
+  if (reservations.length === 0) {
+    try {
+      const fallback = getStaffDashboard_(context, payload);
+      fallback.apiVersion = 'v2';
+      return fallback;
+    } catch (_e2) {}
+  }
+
   if (!canViewAll && role !== 'REPORT_VIEWER') {
     reservations = reservations.filter(function (row) {
       return String(row.DepartmentID || '') === departmentId;
@@ -77,7 +91,7 @@ function getV2Dashboard_(context, payload) {
       DepartmentID: String(row.DepartmentID || ''),
       Status: String(row.OverallStatus || ''),
       RequiredDate: String(row.RequiredDate || ''),
-      Priority: '',
+      Priority: String(row.Priority || ''),
       ItemCount: Number(itemCounts[id] || 0),
       CreatedAt: String(row.CreatedAt || ''),
       Version: Number(row.Version || 0),
